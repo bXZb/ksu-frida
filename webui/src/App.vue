@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
+import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "reka-ui";
 import AppPicker from "./components/AppPicker.vue";
 import GadgetPanel from "./components/GadgetPanel.vue";
 import TargetCard from "./components/TargetCard.vue";
 import { useFrida } from "./composables/useFrida";
 
 const {
-  available,
   tab,
   config,
   expanded,
@@ -45,14 +45,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div v-if="!available" class="gate">
-    <div>
-      <div class="wordmark">Ksu<span>Frida</span></div>
-      <p class="hint">Open this page from KernelSU Manager.</p>
-    </div>
-  </div>
-
-  <div v-else class="shell">
+  <div class="shell">
     <header class="mast">
       <div>
         <div class="wordmark">Ksu<span>Frida</span></div>
@@ -64,17 +57,18 @@ onMounted(() => {
         type="button"
         @click="tab = 'gadget'"
       >
-        {{ gadgetInstalled ? "Gadget live" : "Gadget missing" }}
+        {{ gadgetInstalled ? "Live" : "Missing" }}
       </button>
     </header>
 
-    <nav class="tabs">
-      <button type="button" :class="{ active: tab === 'targets' }" @click="tab = 'targets'">Targets</button>
-      <button type="button" :class="{ active: tab === 'gadget' }" @click="tab = 'gadget'">Gadget</button>
-    </nav>
+    <TabsRoot v-model="tab" class="stage-tabs">
+    <TabsList class="tabs">
+      <TabsTrigger class="tab-trigger" value="targets">Targets</TabsTrigger>
+      <TabsTrigger class="tab-trigger" value="gadget">Gadget</TabsTrigger>
+    </TabsList>
 
     <main class="stage">
-      <section v-if="tab === 'targets'" class="deck">
+      <TabsContent value="targets" class="deck">
         <div class="row">
           <span class="lede" style="margin:0">{{ config.targets.length }} hooked</span>
           <button class="solid" type="button" @click="openPicker">Add app</button>
@@ -94,10 +88,10 @@ onMounted(() => {
           @toggle="toggleExpand(target.app_name)"
           @remove="removeTarget(index)"
         />
-      </section>
+      </TabsContent>
 
+      <TabsContent value="gadget">
       <GadgetPanel
-        v-else
         :installed="gadgetInstalled"
         :detail="gadgetDetail"
         :json="gadgetJson"
@@ -115,7 +109,9 @@ onMounted(() => {
         @remove="removeGadget"
         @pick="gadgetPath = $event"
       />
+      </TabsContent>
     </main>
+    </TabsRoot>
 
     <footer class="dock">
       <button class="ghost" type="button" :disabled="busy" @click="reload">Reload</button>
@@ -124,13 +120,13 @@ onMounted(() => {
   </div>
 
   <AppPicker
-    v-if="pickerOpen"
+    :open="pickerOpen"
     :query="pickerQuery"
     :filter="appFilter"
     :apps="filteredApps"
     :loading="fetchingApps"
     :label-of="labelOf"
-    @close="pickerOpen = false"
+    @update:open="pickerOpen = $event"
     @update:query="pickerQuery = $event"
     @update:filter="setAppFilter"
     @pick="addTarget"

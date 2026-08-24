@@ -25,22 +25,3 @@ export interface Target {
 export interface AppConfig {
   targets: Target[];
 }
-
-export interface PackageInfo {
-  packageName: string;
-  appLabel?: string;
-  label?: string;
-  isSystem?: boolean;
-  error?: string;
-}
-
-export interface GadgetBinary {
-  installed: boolean;
-  detail: string;
-}
-
-export interface ExecResult {
-  errno: number;
-  stdout: string;
-  stderr: string;
-}

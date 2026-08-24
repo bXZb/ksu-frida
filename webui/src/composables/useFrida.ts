@@ -8,13 +8,12 @@ import {
   GADGET_DIR,
   defaultLibs,
 } from "../constants";
-import { exec, hasKsu, ksuCall, parseJsonArray, shellQuote, toast } from "../ksu";
+import { exec, getPackagesInfo, listPackages, shellQuote, toast } from "../ksu";
 import type {
   AppConfig,
   AppFilter,
   ChildGating,
   GadgetJsonStatus,
-  PackageInfo,
   Tab,
   Target,
 } from "../types";
@@ -29,13 +28,6 @@ function parseGadgetJson(raw: string): object {
     throw new SyntaxError("Gadget config must be a JSON object");
   }
   return parsed;
-}
-
-function usableLabel(value: unknown, pkg: string): string {
-  if (value == null) return pkg;
-  const label = String(value).trim();
-  if (!label || label === "null" || label === "undefined") return pkg;
-  return label;
 }
 
 function emptyChild(): ChildGating {
@@ -69,7 +61,7 @@ function stripDemo(cfg: AppConfig): AppConfig {
 }
 
 export function useFrida() {
-  const available = hasKsu();
+  const available = true;
   const tab = ref<Tab>("targets");
   const config = reactive<AppConfig>({ targets: [] });
   const labels = reactive<Record<string, string>>({});
@@ -278,40 +270,13 @@ export function useFrida() {
     if (gadgetScan.value.length === 0) toast("No .so files found under Download or /data/local/tmp");
   }
 
-  function applyPackageInfos(infos: unknown[]): void {
-    for (const item of infos) {
-      const info = item as PackageInfo;
-      if (!info || info.error || !info.packageName) continue;
-      const label = usableLabel(info.appLabel || info.label, info.packageName);
-      if (label !== info.packageName) labels[info.packageName] = label;
+  function loadPackageLabels(names: string[]): void {
+    if (names.length === 0) return;
+    for (const info of getPackagesInfo(names)) {
+      if (info.appLabel && info.appLabel !== info.packageName) {
+        labels[info.packageName] = info.appLabel;
+      }
     }
-  }
-
-  function listPackagesViaKsu(type: AppFilter): string[] {
-    let raw = ksuCall("listPackages", [type]);
-    if (raw == null && type === "user") raw = ksuCall("listUserPackages");
-    else if (raw == null && type === "system") raw = ksuCall("listSystemPackages");
-    else if (raw == null && type === "all") raw = ksuCall("listAllPackages");
-    const names = parseJsonArray(raw).filter((n): n is string => typeof n === "string" && n.length > 0);
-    if (names.length === 0) return [];
-    for (let i = 0; i < names.length; i += 80) {
-      applyPackageInfos(parseJsonArray(ksuCall("getPackagesInfo", [JSON.stringify(names.slice(i, i + 80))])));
-    }
-    names.sort((a, b) => (labels[a] || a).localeCompare(labels[b] || b, undefined, { sensitivity: "base" }));
-    return names;
-  }
-
-  async function listPackagesViaPm(type: AppFilter): Promise<string[]> {
-    const flag = type === "system" ? "-s" : type === "all" ? "" : "-3";
-    const cmd = flag ? `pm list packages ${flag}` : "pm list packages";
-    const r = await exec(cmd);
-    if (r.errno !== 0 || !r.stdout) return [];
-    return r.stdout
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line.startsWith("package:"))
-      .map((line) => line.replace("package:", ""))
-      .filter(Boolean);
   }
 
   async function fetchApps(type: AppFilter = appFilter.value): Promise<void> {
@@ -325,8 +290,9 @@ export function useFrida() {
       while (requested) {
         const current = requested;
         pendingAppFetch = null;
-        let pkgs = listPackagesViaKsu(current);
-        if (pkgs.length === 0) pkgs = await listPackagesViaPm(current);
+        const pkgs = listPackages(current);
+        loadPackageLabels(pkgs);
+        pkgs.sort((a, b) => (labels[a] || a).localeCompare(labels[b] || b, undefined, { sensitivity: "base" }));
         packageCache[current] = pkgs;
         if (appFilter.value === current) apps.value = pkgs;
         requested = pendingAppFetch;
@@ -395,12 +361,10 @@ export function useFrida() {
   }
 
   async function boot(): Promise<void> {
-    if (!available) return;
     await Promise.all([loadConfig(), loadGadgetConfig(), refreshGadgetBinary(), fetchApps("user")]);
   }
 
   return {
-    available,
     tab,
     config,
     labels,
