@@ -6,7 +6,8 @@ const DEFAULT_GADGET_CONFIG = {
     interaction: {
         type: "listen",
         address: "0.0.0.0",
-        port: 27042
+        port: 27042,
+        on_load: "resume"
     }
 };
 const DEMO_PACKAGE = "com.example.package";

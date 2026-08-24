@@ -63,9 +63,18 @@ elif grep -q 'com.example.package' "$TMP_MODULE_DIR/config.json"; then
   fi
 fi
 
+DEFAULT_GADGET_CFG='{"interaction":{"type":"listen","address":"0.0.0.0","port":27042,"on_load":"resume"}}'
+OLD_DEFAULT_GADGET_CFG='{"interaction":{"type":"listen","address":"0.0.0.0","port":27042}}'
+
 if [ ! -f "$TMP_MODULE_DIR/libsecmon.config.so" ]; then
-  ui_print "- Writing default gadget config (listen mode)"
-  printf '%s\n' '{"interaction":{"type":"listen","address":"0.0.0.0","port":27042}}' > "$TMP_MODULE_DIR/libsecmon.config.so"
+  ui_print "- Writing default gadget config (listen + on_load resume)"
+  printf '%s\n' "$DEFAULT_GADGET_CFG" > "$TMP_MODULE_DIR/libsecmon.config.so"
+else
+  CURRENT_GADGET_CFG=$(tr -d '[:space:]' < "$TMP_MODULE_DIR/libsecmon.config.so")
+  if [ "$CURRENT_GADGET_CFG" = "$OLD_DEFAULT_GADGET_CFG" ]; then
+    ui_print "- Updating stock gadget config to on_load resume"
+    printf '%s\n' "$DEFAULT_GADGET_CFG" > "$TMP_MODULE_DIR/libsecmon.config.so"
+  fi
 fi
 
 if [ ! -f "$TMP_MODULE_DIR/libsecmon.so" ]; then

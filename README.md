@@ -61,7 +61,7 @@ Then add a real package in WebUI, or edit `config.json` (see [advanced config](d
 
 ### Connecting
 
-The default gadget config uses **listen mode** on port 27042. After opening the target app:
+The default gadget config uses **listen mode** on port 27042 with `on_load: resume` (so the app is not blocked until a Frida client attaches). After opening the target app:
 
 ```shell
 adb forward tcp:27042 tcp:27042
