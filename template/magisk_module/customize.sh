@@ -24,9 +24,10 @@ ui_print "- Extracting module files"
 extract "$ZIPFILE" 'module.prop' "$MODPATH"
 extract "$ZIPFILE" 'uninstall.sh' "$MODPATH"
 
-mkdir -p "$MODPATH/webroot"
+mkdir -p "$MODPATH/webroot/assets"
 extract "$ZIPFILE" 'webroot/index.html' "$MODPATH/webroot" true
-extract "$ZIPFILE" 'webroot/main.js' "$MODPATH/webroot" true
+extract "$ZIPFILE" 'webroot/assets/app.js' "$MODPATH/webroot/assets" true
+extract "$ZIPFILE" 'webroot/assets/app.css' "$MODPATH/webroot/assets" true
 
 LIB32_NAME="armeabi-v7a.so"
 LIB64_NAME="arm64-v8a.so"

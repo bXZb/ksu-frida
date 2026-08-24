@@ -106,11 +106,23 @@ Leave `injected_libraries` empty to inject nothing for that target.
 
 ## Building
 
+Requires JDK 11+, Android NDK, and Node.js 20+ (WebUI is Vue 3, built into `webroot/` at assemble time).
+
 ```shell
 ./gradlew :module:assembleRelease
 ```
 
 Output ZIP will be in the `out/` directory. The ZIP does not contain a Frida gadget.
+
+To iterate on the WebUI alone:
+
+```shell
+cd webui
+npm install
+npm run dev
+```
+
+`npm run dev` has no `window.ksu` — open the built page from KernelSU Manager to talk to the device.
 
 To build, install and reboot directly:
 ```shell

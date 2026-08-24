@@ -57,6 +57,30 @@ android {
     }
 }
 
+def npmCommand = System.getProperty("os.name").toLowerCase().contains("windows") ? "npm.cmd" : "npm"
+def webuiDir = file("$rootDir/webui")
+
+task npmCiWebui(type: Exec) {
+    workingDir webuiDir
+    commandLine npmCommand, "ci"
+    onlyIf { file("$webuiDir/package-lock.json").exists() }
+}
+
+task npmInstallWebui(type: Exec) {
+    workingDir webuiDir
+    commandLine npmCommand, "install"
+    onlyIf { !file("$webuiDir/package-lock.json").exists() }
+}
+
+task buildWebui(type: Exec) {
+    dependsOn npmCiWebui, npmInstallWebui
+    workingDir webuiDir
+    commandLine npmCommand, "run", "build"
+    inputs.dir("$webuiDir/src")
+    inputs.files("$webuiDir/package.json", "$webuiDir/vite.config.ts", "$webuiDir/index.html")
+    outputs.dir("$rootDir/template/magisk_module/webroot")
+}
+
 afterEvaluate {
     android.libraryVariants.forEach { variant ->
         def variantCapped = variant.name.capitalize()
@@ -71,6 +95,7 @@ afterEvaluate {
 
         task("prepareMagiskFiles${variantCapped}", type: Sync) {
             dependsOn("assemble$variantCapped")
+            dependsOn buildWebui
             duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
             def templatePath = "$rootDir/template/magisk_module"

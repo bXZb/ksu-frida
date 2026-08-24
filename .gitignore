@@ -12,3 +12,7 @@ local.properties
 !.gitkeep
 /.claude
 out
+webui/node_modules
+template/magisk_module/webroot/index.html
+template/magisk_module/webroot/assets
+template/magisk_module/webroot/main.js

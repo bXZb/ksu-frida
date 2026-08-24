@@ -1,4 +1,5 @@
 # v1.9.32
+- WebUI rebuilt in Vue 3 (Targets / Gadget tabs); dist is generated at assemble time
 - Default gadget config uses `on_load: resume` so injection does not ANR waiting for a client
 - Gadget is no longer bundled or unpacked on install; install your own `.so` via WebUI or `cp`
 - WebUI: scan/install/remove gadget binary; optional clear of `injected_libraries`
