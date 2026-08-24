@@ -32,21 +32,6 @@ LIB32_NAME="armeabi-v7a.so"
 LIB64_NAME="arm64-v8a.so"
 LIB32_DEST="$MODPATH/zygisk"
 LIB64_DEST="$MODPATH/zygisk"
-BUSYBOX_BIN=/data/adb/magisk/busybox
-
-if [ ! -f $BUSYBOX_BIN ]; then
-  BUSYBOX_BIN=/data/adb/ksu/bin/busybox
-fi
-
-if [ ! -f $BUSYBOX_BIN ]; then
-  BUSYBOX_BIN=/data/adb/ap/bin/busybox
-fi
-
-if [ ! -f $BUSYBOX_BIN ]; then
-  abort "! unable to locate busybox"
-fi
-
-ui_print "- Using busybox: $BUSYBOX_BIN"
 
 [ "$ARCH" = "x86" ] || [ "$ARCH" = "x64" ] && LIB32_NAME="x86.so"
 [ "$ARCH" = "x86" ] || [ "$ARCH" = "x64" ] && LIB64_NAME="x86_64.so"
@@ -62,26 +47,31 @@ if [ "$IS64BIT" = true ]; then
   extract "$ZIPFILE" "lib/$LIB64_NAME" "$LIB64_DEST" true
 fi
 
-ui_print "- Extracting bundled frida gadget"
-
+ui_print "- Preparing runtime directory (gadget is not bundled)"
 mkdir -p "$TMP_MODULE_DIR"
-extract "$ZIPFILE" "gadget/libgadget-$ARCH.so.xz" "$TMP_MODULE_DIR" true
-mv "$TMP_MODULE_DIR/libgadget-$ARCH.so.xz" "$TMP_MODULE_DIR/libsecmon.so.xz"
-$BUSYBOX_BIN unxz "$TMP_MODULE_DIR/libsecmon.so.xz"
-
-if [ "$IS64BIT" = true ]; then
-  ARCH32="arm"
-  [ "$ARCH" = "x64" ] && ARCH32="x86"
-
-  extract "$ZIPFILE" "gadget/libgadget-$ARCH32.so.xz" "$TMP_MODULE_DIR" true
-  mv "$TMP_MODULE_DIR/libgadget-$ARCH32.so.xz" "$TMP_MODULE_DIR/libsecmon32.so.xz"
-  $BUSYBOX_BIN unxz "$TMP_MODULE_DIR/libsecmon32.so.xz"
-fi
 
 extract "$ZIPFILE" "config.json.example" "$TMP_MODULE_DIR" true
 
-ui_print "- Writing default gadget config (listen mode)"
-echo '{"interaction":{"type":"listen","address":"0.0.0.0","port":27042}}' > "$TMP_MODULE_DIR/libsecmon.config.so"
+if [ ! -f "$TMP_MODULE_DIR/config.json" ]; then
+  ui_print "- Writing empty target list"
+  printf '%s\n' '{ "targets": [] }' > "$TMP_MODULE_DIR/config.json"
+elif grep -q 'com.example.package' "$TMP_MODULE_DIR/config.json"; then
+  NAME_COUNT=$(grep -c '"app_name"' "$TMP_MODULE_DIR/config.json" || true)
+  if [ "$NAME_COUNT" = "1" ]; then
+    ui_print "- Removing leftover demo target"
+    printf '%s\n' '{ "targets": [] }' > "$TMP_MODULE_DIR/config.json"
+  fi
+fi
+
+if [ ! -f "$TMP_MODULE_DIR/libsecmon.config.so" ]; then
+  ui_print "- Writing default gadget config (listen mode)"
+  printf '%s\n' '{"interaction":{"type":"listen","address":"0.0.0.0","port":27042}}' > "$TMP_MODULE_DIR/libsecmon.config.so"
+fi
+
+if [ ! -f "$TMP_MODULE_DIR/libsecmon.so" ]; then
+  ui_print "! No gadget installed. Use WebUI or copy a .so to:"
+  ui_print "  $TMP_MODULE_DIR/libsecmon.so"
+fi
 
 set_perm_recursive "$TMP_MODULE_DIR" 0 0 0755 0644
 set_perm_recursive "$MODPATH" 0 0 0755 0644

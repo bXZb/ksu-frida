@@ -9,9 +9,11 @@ Both configurations are supported with the advanced config taking precedence in 
 ## Config File
 
 This module is configured via a json config located at `/data/local/tmp/libsec/config.json`.
-To start off, you can copy the example config
+A first install writes `{ "targets": [] }` if that file does not already exist. `config.json.example` is the same empty stub — it is not a live demo target.
+
+Prefer adding apps from the KernelSU WebUI. To start from a blank file manually:
 ```shell
-adb shell su -c 'cp /data/local/tmp/libsec/config.json.example /data/local/tmp/libsec/config.json'
+adb shell su -c 'printf "%s\n" "{ \"targets\": [] }" > /data/local/tmp/libsec/config.json'
 ```
 
 Example config
@@ -69,25 +71,19 @@ might run checks at start up and delaying the injection can help avoid these.
 These are the libraries that will be injected into the process. The libraries
 specified here will be loaded in the order of the array.
 
-The module includes a bundled frida gadget at `/data/local/tmp/libsec/libsecmon.so`.
-`libsecmon.so` default architecture is always that of your device.
+The gadget is **not** bundled in the module ZIP and is **not** unpacked on install.
+Place a Frida gadget shared library (not `frida-server`) at `/data/local/tmp/libsec/libsecmon.so`
+via WebUI (**Gadget Binary** → scan / path → Install) or `cp`. Match the ABI of the target process
+(`android-arm` vs `android-arm64`). For 32-bit-only apps on a 64-bit device, install a 32-bit gadget
+as a separate file (for example `libsecmon32.so`) and point `injected_libraries` at that path.
 
-For convenience this module also installs a 32-bit gadget at `/data/local/tmp/libsec/libsecmon32.so` for injection into applications
-with 32-bit only support on 64-bit devices.
+You can adjust the gadget config at `/data/local/tmp/libsec/libsecmon.config.so` according to the official [Gadget Doc](https://frida.re/docs/gadget/).
 
-You can adjust the gadget config according to the official [Gadget Doc](https://frida.re/docs/gadget/)
+Using this you can also inject arbitrary libraries alongside the gadget, or omit the gadget by leaving
+`injected_libraries` empty. Make sure the libraries have permissions the app can read.
 
-If you want to use a different frida version or an alternative version you can replace this
-with the path to your own gadget.
-
-Using this you can also inject arbitrary libraries alongside the gadget or without the gadget if
-you remove it.
-Make sure that the libraries you provide here have the correct file permissions set and are accessible
-by the app itself.
-
-The module will setup file permissions in the complete `libsec` directory on install. If you suspect
-a file permission issue, an easy way to check is to place your libraries within the `libsec` directory
-and install the module again (without uninstalling).
+The module sets `0644` on `/data/local/tmp/libsec` on install but will not overwrite an existing
+`libsecmon.so` or `config.json`. If you suspect a permission issue, `chmod 644` the files in that directory.
 
 
 ## Child gating configuration (experimental)

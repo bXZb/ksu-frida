@@ -1,3 +1,9 @@
+# v1.9.32
+- Gadget is no longer bundled or unpacked on install; install your own `.so` via WebUI or `cp`
+- WebUI: scan/install/remove gadget binary; optional clear of `injected_libraries`
+- Fresh installs and WebUI start with an empty target list (demo `com.example.package` removed)
+- Stopped auto-bump of a bundled Frida version
+
 # v1.9.20
 - Fixed WebUI-saved config file permissions so the target app can read them (thanks @limbang, #7)
 

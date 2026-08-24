@@ -5,40 +5,12 @@ import java.nio.file.Paths
 import java.nio.file.Files
 import java.security.MessageDigest
 
-plugins {
-    id "de.undercouch.download" version "5.4.0"
-}
-
 apply plugin: 'com.android.library'
 apply from: file(rootProject.file('module.gradle'))
 
 dependencies {
     implementation 'dev.rikka.ndk.thirdparty:cxx:1.2.0'
     implementation("io.github.vvb2060.ndk:dobby:1.2")
-}
-
-task downloadFrida(type: Download) {
-    def downloadArchs = ["arm", "arm64"]
-    def magiskArchs = ["arm", "arm64"]
-
-    def sources = downloadArchs.collect{
-        arch -> "https://github.com/gorkemgun/knox-frida-patcher/releases/download/${fridaVersion}/frida-gadget-${fridaVersion}-android-${arch}.so.xz".toString()
-    }
-
-    def outputs = magiskArchs.collect{
-        arch ->  "libgadget-${arch}.so.xz".toString()
-    }
-
-    def downloads = [sources, outputs].transpose().collectEntries()
-
-    src downloads.keySet()
-    dest "$rootDir/gadget"
-    overwrite true
-    onlyIfModified true
-    quiet true
-    eachFile { f ->
-        f.name = downloads[f.sourceURL.toString()]
-    }
 }
 
 android {
@@ -99,7 +71,6 @@ afterEvaluate {
 
         task("prepareMagiskFiles${variantCapped}", type: Sync) {
             dependsOn("assemble$variantCapped")
-            dependsOn downloadFrida
             duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
             def templatePath = "$rootDir/template/magisk_module"
@@ -140,10 +111,6 @@ afterEvaluate {
             }
             from("$buildDir/intermediates/stripped_native_libs/$variantCapped/out/lib") {
                 into 'lib'
-            }
-            from("$rootDir/gadget") {
-                exclude '.gitkeep'
-                into 'gadget'
             }
             doLast {
                 fileTree("$magiskDir/lib").visit { f ->

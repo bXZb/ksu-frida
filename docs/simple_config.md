@@ -32,12 +32,10 @@ This can help if you want to time the injection with app interactions.
 
 **Gadget version and config**
 
-The bundled gadget is located at `/data/local/tmp/libsec/libsecmon.so`.
-You can follow the [Gadget Docs](https://frida.re/docs/gadget/) and add additional
-gadget config and scripts in that location.
-
-In case you want to use a different gadget version than the one bundled, you can simply
-replace `libsecmon.so` with your own frida gadget.
+There is no bundled gadget. Install your own Frida gadget `.so` as
+`/data/local/tmp/libsec/libsecmon.so` (WebUI **Gadget Binary**, or `cp`).
+Follow the [Gadget Docs](https://frida.re/docs/gadget/) for `libsecmon.config.so`
+and extra scripts in that directory.
 
 **Loading arbitrary libraries**
 
@@ -49,7 +47,7 @@ For this you can add the file `/data/local/tmp/libsec/injected_libraries`.
 The file should consist of file paths to libraries.
 The libraries are loaded in the order they are specified in the file.
 
-Example file content that would first load libhelperexample.so and then the bundled frida-gadget:
+Example file content that would first load libhelperexample.so and then your installed gadget:
 ```
 /data/local/tmp/libsec/libhelperexample.so
 /data/local/tmp/libsec/libsecmon.so
@@ -58,6 +56,6 @@ Example file content that would first load libhelperexample.so and then the bund
 Make sure the libraries are located somewhere accessible by the app and that
 file permissions are properly set.
 
-If you want the frida gadget to start, you need to explicitly specify the bundled frida-gadget at
-`/data/local/tmp/libsec/libsecmon.so`.
-You can also choose to specify your own gadget this way or omit the gadget altogether.
+If you want the frida gadget to start, you need to explicitly specify it at
+`/data/local/tmp/libsec/libsecmon.so` (or another path you installed).
+You can also omit the gadget altogether.

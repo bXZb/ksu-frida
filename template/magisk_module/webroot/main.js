@@ -1,9 +1,14 @@
 const CONFIG_PATH = "/data/local/tmp/libsec/config.json";
 const GADGET_CONFIG_PATH = "/data/local/tmp/libsec/libsecmon.config.so";
+const GADGET_BIN_PATH = "/data/local/tmp/libsec/libsecmon.so";
+const GADGET_DIR = "/data/local/tmp/libsec";
+const DEFAULT_GADGET_CONFIG = '{"interaction":{"type":"listen","address":"0.0.0.0","port":27042}}';
+const DEMO_PACKAGE = "com.example.package";
 
 let config = { targets: [] };
 let allApps = [];
 let callbackId = 0;
+let gadgetInstalled = false;
 
 // ── KSU exec wrapper using string-based callback registration ────────────────
 function exec(cmd) {
@@ -17,29 +22,57 @@ function exec(cmd) {
     });
 }
 
+function shellQuote(s) {
+    return "'" + String(s).replace(/'/g, "'\\''") + "'";
+}
+
+function defaultLibs() {
+    return [{ path: GADGET_BIN_PATH }];
+}
+
+function stripDemoTargets(cfg) {
+    if (!cfg || !Array.isArray(cfg.targets)) {
+        return { targets: [] };
+    }
+    cfg.targets = cfg.targets.filter(function (t) {
+        return t && t.app_name && t.app_name !== DEMO_PACKAGE;
+    });
+    return cfg;
+}
+
 // ── Config I/O ───────────────────────────────────────────────────────────────
 async function loadConfig() {
+    var stripped = false;
     var r = await exec("cat " + CONFIG_PATH);
     if (r.errno === 0 && r.stdout.trim().length > 0) {
         try {
-            config = JSON.parse(r.stdout);
+            var parsed = JSON.parse(r.stdout);
+            var before = Array.isArray(parsed.targets) ? parsed.targets.length : 0;
+            config = stripDemoTargets(parsed);
+            stripped = before !== config.targets.length;
         } catch (e) {
             ksu.toast("Config parse error: " + e.message);
-            return;
+            config = { targets: [] };
         }
     } else {
-        var ex = await exec("cat /data/local/tmp/libsec/config.json.example");
-        if (ex.errno === 0) {
-            try { config = JSON.parse(ex.stdout); } catch (_) {}
-        }
+        config = { targets: [] };
+    }
+    if (!Array.isArray(config.targets)) {
+        config.targets = [];
     }
     renderTargets();
+    if (stripped) {
+        await writeConfig();
+    }
+}
+
+async function writeConfig() {
+    var json = JSON.stringify(config, null, 4);
+    return exec("echo " + shellQuote(json) + " > " + CONFIG_PATH + " && chmod 644 " + CONFIG_PATH);
 }
 
 async function saveConfig() {
-    var json = JSON.stringify(config, null, 4);
-    var escaped = json.replace(/'/g, "'\\''");
-    var r = await exec("echo '" + escaped + "' > " + CONFIG_PATH + " && chmod 644 " + CONFIG_PATH);
+    var r = await writeConfig();
     if (r.errno === 0) {
         ksu.toast("Config saved");
     } else {
@@ -58,14 +91,13 @@ async function loadGadgetConfig() {
     } else {
         status.className = "status-err";
         status.textContent = "Not found";
-        editor.value = '{"interaction":{"type":"listen","address":"0.0.0.0","port":27042}}';
+        editor.value = DEFAULT_GADGET_CONFIG;
     }
 }
 
 async function saveGadgetConfig() {
     var content = document.getElementById("gadget-editor").value;
-    var escaped = content.replace(/'/g, "'\\''");
-    var r = await exec("echo '" + escaped + "' > " + GADGET_CONFIG_PATH + " && chmod 644 " + GADGET_CONFIG_PATH);
+    var r = await exec("echo " + shellQuote(content) + " > " + GADGET_CONFIG_PATH + " && chmod 644 " + GADGET_CONFIG_PATH);
     if (r.errno === 0) {
         ksu.toast("Gadget config saved");
         loadGadgetConfig();
@@ -74,11 +106,136 @@ async function saveGadgetConfig() {
     }
 }
 
+function clearAllInjectedLibraries() {
+    (config.targets || []).forEach(function (t) {
+        t.injected_libraries = [];
+        if (t.child_gating) {
+            t.child_gating.injected_libraries = [];
+        }
+    });
+    renderTargets();
+}
+
+async function maybeClearLibraries() {
+    var box = document.getElementById("opt-clear-libs");
+    if (!box || !box.checked) {
+        return false;
+    }
+    clearAllInjectedLibraries();
+    await saveConfig();
+    return true;
+}
+
+async function refreshGadgetBinary() {
+    var status = document.getElementById("gadget-bin-status");
+    var info = document.getElementById("gadget-bin-info");
+    var r = await exec(
+        "if [ -f " + GADGET_BIN_PATH + " ]; then " +
+        "stat -c '%s %y' " + GADGET_BIN_PATH + " 2>/dev/null || ls -l " + GADGET_BIN_PATH + "; " +
+        "else echo MISSING; fi"
+    );
+    var text = (r.stdout || "").trim();
+    gadgetInstalled = r.errno === 0 && text.length > 0 && text.indexOf("MISSING") !== 0;
+    if (gadgetInstalled) {
+        status.className = "status-ok";
+        status.textContent = "Installed";
+        info.textContent = GADGET_BIN_PATH + "  (" + text + ")";
+    } else {
+        status.className = "status-err";
+        status.textContent = "Missing";
+        info.textContent = "No gadget at " + GADGET_BIN_PATH;
+    }
+}
+
+async function installGadget() {
+    var src = (document.getElementById("gadget-path").value || "").trim();
+    if (!src) {
+        ksu.toast("Pick or enter a .so path first");
+        return;
+    }
+    if (src.indexOf("\n") !== -1 || src.indexOf(";") !== -1) {
+        ksu.toast("Invalid path");
+        return;
+    }
+
+    var cmd =
+        "set -e; " +
+        "SRC=" + shellQuote(src) + "; " +
+        "DST=" + shellQuote(GADGET_BIN_PATH) + "; " +
+        "DIR=" + shellQuote(GADGET_DIR) + "; " +
+        "mkdir -p \"$DIR\"; " +
+        "if [ ! -f \"$SRC\" ]; then echo 'source not found' >&2; exit 2; fi; " +
+        "case \"$SRC\" in " +
+        "  *.xz) " +
+        "    UNXZ=''; " +
+        "    for c in /data/adb/ksu/bin/busybox /data/adb/magisk/busybox /data/adb/ap/bin/busybox busybox unxz xz; do " +
+        "      [ -x \"$c\" ] || command -v \"$c\" >/dev/null 2>&1 || continue; " +
+        "      UNXZ=\"$c\"; break; " +
+        "    done; " +
+        "    if [ -z \"$UNXZ\" ]; then echo 'no unxz/busybox found' >&2; exit 3; fi; " +
+        "    if [ \"$UNXZ\" = xz ]; then xz -dc \"$SRC\" > \"$DST\"; " +
+        "    elif [ \"$UNXZ\" = unxz ]; then unxz -c \"$SRC\" > \"$DST\"; " +
+        "    else \"$UNXZ\" unxz -c \"$SRC\" > \"$DST\"; fi; " +
+        "    ;; " +
+        "  *) cp -f \"$SRC\" \"$DST\" ;; " +
+        "esac; " +
+        "chmod 644 \"$DST\"; " +
+        "HDR=$(od -An -N4 -tx1 \"$DST\" 2>/dev/null | tr -d ' \\n'); " +
+        "if [ \"$HDR\" != \"7f454c46\" ]; then echo 'not an ELF .so' >&2; rm -f \"$DST\"; exit 4; fi; " +
+        "echo OK";
+
+    var r = await exec(cmd);
+    if (r.errno === 0 && (r.stdout || "").indexOf("OK") !== -1) {
+        ksu.toast("Gadget installed");
+        await maybeClearLibraries();
+        await refreshGadgetBinary();
+    } else {
+        ksu.toast("Install failed: " + ((r.stderr || r.stdout || "unknown").trim()));
+        await refreshGadgetBinary();
+    }
+}
+
+async function removeGadget() {
+    var r = await exec("rm -f " + GADGET_BIN_PATH);
+    if (r.errno === 0) {
+        ksu.toast("Gadget removed");
+        await maybeClearLibraries();
+        await refreshGadgetBinary();
+    } else {
+        ksu.toast("Remove failed: " + r.stderr);
+    }
+}
+
+async function scanGadgetCandidates() {
+    var list = document.getElementById("gadget-scan-list");
+    list.innerHTML = '<div class="empty">Scanning...</div>';
+    var r = await exec(
+        "find /sdcard/Download /sdcard/Downloads /storage/emulated/0/Download " +
+        "/data/local/tmp /sdcard -maxdepth 3 -type f " +
+        "\\( -name '*.so' -o -name '*.so.xz' \\) 2>/dev/null | head -n 80"
+    );
+    var paths = (r.stdout || "").split("\n").map(function (l) { return l.trim(); }).filter(Boolean);
+    if (paths.length === 0) {
+        list.innerHTML = '<div class="empty">No .so files found under Download or /data/local/tmp</div>';
+        return;
+    }
+    list.innerHTML = "";
+    paths.forEach(function (p) {
+        var row = document.createElement("div");
+        row.className = "scan-row";
+        row.textContent = p;
+        row.onclick = function () {
+            document.getElementById("gadget-path").value = p;
+            ksu.toast("Selected");
+        };
+        list.appendChild(row);
+    });
+}
+
 // ── App list ─────────────────────────────────────────────────────────────────
 var appLabels = {};
 
 async function fetchApps() {
-    // Get 3rd party packages with labels in one shot
     var r = await exec(
         "for p in $(pm list packages -3 | sed 's/package://'); do " +
         "l=$(dumpsys package \"$p\" | grep -m1 'nonLocalizedLabel=' | sed 's/.*nonLocalizedLabel=//;s/ .*//'); " +
@@ -99,7 +256,6 @@ async function fetchApps() {
             return (appLabels[a] || a).localeCompare(appLabels[b] || b);
         });
     }
-    // Fallback: just package names
     if (allApps.length === 0) {
         var r2 = await exec("pm list packages -3");
         if (r2.errno === 0 && r2.stdout.trim().length > 0) {
@@ -120,7 +276,7 @@ function renderTargets() {
     var container = document.getElementById("targets");
     container.innerHTML = "";
 
-    if (config.targets.length === 0) {
+    if (!config.targets || config.targets.length === 0) {
         container.innerHTML = '<div class="empty">No targets configured. Tap + Add to start.</div>';
         return;
     }
@@ -144,7 +300,7 @@ function renderTargets() {
                 '<textarea onchange="updateField(' + i + ',\'child_libs\',this.value)">' + childLibs + '</textarea></div>';
         }
 
-        var libs = t.injected_libraries.map(function (l) { return l.path; }).join("\n");
+        var libs = (t.injected_libraries || []).map(function (l) { return l.path; }).join("\n");
 
         div.innerHTML =
             '<div class="row">' +
@@ -229,7 +385,7 @@ function addTarget(pkg) {
         enabled: true,
         kernel_assisted_evasion: false,
         start_up_delay_ms: 0,
-        injected_libraries: [{ path: "/data/local/tmp/libsec/libsecmon.so" }],
+        injected_libraries: defaultLibs(),
         child_gating: { enabled: false, mode: "freeze", injected_libraries: [] }
     });
     renderTargets();
@@ -285,12 +441,20 @@ window.onload = function () {
 
     document.getElementById("btn-add").onclick = showAppList;
     document.getElementById("btn-save").onclick = saveConfig;
-    document.getElementById("btn-reload").onclick = function () { loadConfig(); loadGadgetConfig(); };
+    document.getElementById("btn-reload").onclick = function () {
+        loadConfig();
+        loadGadgetConfig();
+        refreshGadgetBinary();
+    };
     document.getElementById("btn-save-gadget").onclick = saveGadgetConfig;
+    document.getElementById("btn-install-gadget").onclick = installGadget;
+    document.getElementById("btn-remove-gadget").onclick = removeGadget;
+    document.getElementById("btn-scan-gadget").onclick = scanGadgetCandidates;
     document.getElementById("btn-close-modal").onclick = closeAppModal;
     document.getElementById("app-search").oninput = renderAppList;
 
     loadConfig();
     loadGadgetConfig();
+    refreshGadgetBinary();
     fetchApps();
 };
