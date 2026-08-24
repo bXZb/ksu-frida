@@ -26,6 +26,18 @@ function shellQuote(s) {
     return "'" + String(s).replace(/'/g, "'\\''") + "'";
 }
 
+function escapeHtml(s) {
+    return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
+
+function escapeAttr(s) {
+    return escapeHtml(s).replace(/\n/g, " ");
+}
+
 function defaultLibs() {
     return [{ path: GADGET_BIN_PATH }];
 }
@@ -301,11 +313,14 @@ function renderTargets() {
         }
 
         var libs = (t.injected_libraries || []).map(function (l) { return l.path; }).join("\n");
+        var label = getAppLabel(t.app_name);
 
         div.innerHTML =
             '<div class="row">' +
-                '<div><strong>' + getAppLabel(t.app_name) + '</strong>' +
-                '<div style="font-size:11px;color:var(--text2)">' + t.app_name + '</div></div>' +
+                '<div class="target-title" title="' + escapeAttr(label + " (" + t.app_name + ")") + '">' +
+                    '<strong>' + escapeHtml(label) + '</strong>' +
+                    '<div class="target-pkg">' + escapeHtml(t.app_name) + '</div>' +
+                '</div>' +
                 '<div class="row row-gap">' +
                     '<label class="switch"><input type="checkbox"' + (t.enabled ? " checked" : "") +
                     ' onchange="updateField(' + i + ',\'enabled\',this.checked)"><span class="slider"></span></label>' +

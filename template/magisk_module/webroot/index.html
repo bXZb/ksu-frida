@@ -63,9 +63,29 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 8px;
+            min-width: 0;
         }
 
-        .row-gap { gap: 8px; }
+        .row-gap { gap: 8px; flex-shrink: 0; }
+
+        .target-title {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .target-title strong,
+        .target-pkg {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .target-pkg {
+            font-size: 11px;
+            color: var(--text2);
+        }
 
         .field { margin-top: 10px; }
         .field label { font-size: 12px; color: var(--text2); display: block; margin-bottom: 4px; }
