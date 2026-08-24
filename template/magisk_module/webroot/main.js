@@ -2,7 +2,13 @@ const CONFIG_PATH = "/data/local/tmp/libsec/config.json";
 const GADGET_CONFIG_PATH = "/data/local/tmp/libsec/libsecmon.config.so";
 const GADGET_BIN_PATH = "/data/local/tmp/libsec/libsecmon.so";
 const GADGET_DIR = "/data/local/tmp/libsec";
-const DEFAULT_GADGET_CONFIG = '{"interaction":{"type":"listen","address":"0.0.0.0","port":27042}}';
+const DEFAULT_GADGET_CONFIG = {
+    interaction: {
+        type: "listen",
+        address: "0.0.0.0",
+        port: 27042
+    }
+};
 const DEMO_PACKAGE = "com.example.package";
 
 let config = { targets: [] };
@@ -92,28 +98,59 @@ async function saveConfig() {
     }
 }
 
-async function loadGadgetConfig() {
+function prettyJson(value) {
+    return JSON.stringify(value, null, 4);
+}
+
+function parseGadgetJson(raw) {
+    var parsed = JSON.parse(raw);
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new SyntaxError("Gadget config must be a JSON object");
+    }
+    return parsed;
+}
+
+function setGadgetStatus(kind, text) {
     var status = document.getElementById("gadget-status");
+    status.className = kind === "ok" ? "status-ok" : "status-err";
+    status.textContent = text;
+}
+
+async function loadGadgetConfig() {
     var editor = document.getElementById("gadget-editor");
     var r = await exec("cat " + GADGET_CONFIG_PATH);
-    if (r.errno === 0) {
-        status.className = "status-ok";
-        status.textContent = "OK";
+    if (r.errno !== 0) {
+        setGadgetStatus("err", "Not found");
+        editor.value = prettyJson(DEFAULT_GADGET_CONFIG);
+        return;
+    }
+    try {
+        editor.value = prettyJson(parseGadgetJson(r.stdout));
+        setGadgetStatus("ok", "OK");
+    } catch (e) {
         editor.value = r.stdout;
-    } else {
-        status.className = "status-err";
-        status.textContent = "Not found";
-        editor.value = DEFAULT_GADGET_CONFIG;
+        setGadgetStatus("err", "Invalid JSON");
+        ksu.toast("Gadget config parse error: " + e.message);
     }
 }
 
 async function saveGadgetConfig() {
-    var content = document.getElementById("gadget-editor").value;
-    var r = await exec("echo " + shellQuote(content) + " > " + GADGET_CONFIG_PATH + " && chmod 644 " + GADGET_CONFIG_PATH);
+    var editor = document.getElementById("gadget-editor");
+    var pretty;
+    try {
+        pretty = prettyJson(parseGadgetJson(editor.value));
+    } catch (e) {
+        setGadgetStatus("err", "Invalid JSON");
+        ksu.toast("Invalid JSON: " + e.message);
+        return;
+    }
+    editor.value = pretty;
+    var r = await exec("echo " + shellQuote(pretty) + " > " + GADGET_CONFIG_PATH + " && chmod 644 " + GADGET_CONFIG_PATH);
     if (r.errno === 0) {
+        setGadgetStatus("ok", "OK");
         ksu.toast("Gadget config saved");
-        loadGadgetConfig();
     } else {
+        setGadgetStatus("err", "Save failed");
         ksu.toast("Failed: " + r.stderr);
     }
 }
