@@ -4,6 +4,7 @@ import {
   DrawerClose,
   DrawerContent,
   DrawerHandle,
+  DrawerOverlay,
   DrawerPortal,
   DrawerRoot,
   DrawerTitle,
