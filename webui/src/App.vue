@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { Plus } from "@lucide/vue";
 import AppPicker from "./components/AppPicker.vue";
 import GadgetPanel from "./components/GadgetPanel.vue";
@@ -48,8 +48,36 @@ const {
   toggleExpand,
 } = useFrida();
 
+const tabThumb = reactive({ x: 0, width: 0 });
+const tabThumbReady = ref(false);
+
+function updateTabThumb(): void {
+  const list = document.querySelector<HTMLElement>("[data-slot=tabs-list]");
+  const active = list?.querySelector<HTMLElement>('[data-slot=tabs-trigger][data-state="active"]');
+  if (!list || !active) return;
+  const listRect = list.getBoundingClientRect();
+  const activeRect = active.getBoundingClientRect();
+  tabThumb.x = activeRect.left - listRect.left;
+  tabThumb.width = activeRect.width;
+  tabThumbReady.value = true;
+}
+
+watch(tab, () => void nextTick(updateTabThumb));
+
+let tabsListObserver: ResizeObserver | undefined;
+
 onMounted(() => {
   void boot();
+  updateTabThumb();
+  const list = document.querySelector<HTMLElement>("[data-slot=tabs-list]");
+  if (list) {
+    tabsListObserver = new ResizeObserver(() => updateTabThumb());
+    tabsListObserver.observe(list);
+  }
+});
+
+onBeforeUnmount(() => {
+  tabsListObserver?.disconnect();
 });
 </script>
 
@@ -80,9 +108,25 @@ onMounted(() => {
     </header>
 
     <Tabs v-model="tab" class="mt-3 flex min-h-0 flex-1 flex-col">
-      <TabsList class="grid w-full grid-cols-2">
-        <TabsTrigger value="targets">Targets</TabsTrigger>
-        <TabsTrigger value="gadget">Gadget</TabsTrigger>
+      <TabsList class="relative grid w-full grid-cols-2">
+        <span
+          aria-hidden="true"
+          class="bg-background shadow-sm pointer-events-none absolute inset-y-0.75 left-0 z-0 rounded-md"
+          :class="tabThumbReady ? 'transition-[width,transform] duration-200 ease-out' : undefined"
+          :style="{ width: `${tabThumb.width}px`, transform: `translateX(${tabThumb.x}px)` }"
+        />
+        <TabsTrigger
+          value="targets"
+          class="relative z-10 text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:font-semibold data-[state=active]:shadow-none"
+        >
+          Targets
+        </TabsTrigger>
+        <TabsTrigger
+          value="gadget"
+          class="relative z-10 text-muted-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:font-semibold data-[state=active]:shadow-none"
+        >
+          Gadget
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent
