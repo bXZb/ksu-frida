@@ -123,6 +123,8 @@ export function useFrida() {
     ),
   );
 
+  const addedSet = computed(() => new Set(config.targets.map((t) => t.app_name)));
+
   function labelOf(pkg: string): string {
     return labels[pkg] || pkg;
   }
@@ -350,7 +352,7 @@ export function useFrida() {
   }
 
   function addTarget(pkg: string): void {
-    if (config.targets.some((t) => t.app_name === pkg)) {
+    if (addedSet.value.has(pkg)) {
       toast("Already added");
       return;
     }
@@ -362,7 +364,7 @@ export function useFrida() {
       injected_libraries: defaultLibs(),
       child_gating: emptyChild(),
     });
-    pickerOpen.value = false;
+    toast.success(`Added ${labels[pkg] || pkg}`);
   }
 
   function removeTarget(pkg: string): void {
@@ -410,6 +412,7 @@ export function useFrida() {
     dirty,
     targetFilter,
     filteredTargets,
+    addedSet,
     gadgetInstalled,
     gadgetDetail,
     gadgetJson,

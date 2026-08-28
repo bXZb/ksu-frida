@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
+import { Plus } from "@lucide/vue";
 import AppPicker from "./components/AppPicker.vue";
 import GadgetPanel from "./components/GadgetPanel.vue";
 import TargetCard from "./components/TargetCard.vue";
 import { useFrida } from "./composables/useFrida";
-import { Badge } from "@/components/ui/badge";
+import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -20,6 +21,7 @@ const {
   dirty,
   targetFilter,
   filteredTargets,
+  addedSet,
   gadgetInstalled,
   gadgetDetail,
   gadgetJson,
@@ -86,7 +88,10 @@ onMounted(() => {
           <span class="text-[11px] tracking-[0.14em] uppercase text-muted-foreground">
             {{ config.targets.length }} hooked
           </span>
-          <Button size="sm" @click="openPicker">+ Add app</Button>
+              <Button size="sm" @click="openPicker">
+            <Plus class="size-4" />
+            Add app
+          </Button>
         </div>
 
         <div v-if="config.targets.length" class="flex items-center gap-1.5">
@@ -169,9 +174,12 @@ onMounted(() => {
     :apps="filteredApps"
     :loading="fetchingApps"
     :label-of="labelOf"
+    :added="addedSet"
     @update:open="pickerOpen = $event"
     @update:query="pickerQuery = $event"
     @update:filter="setAppFilter"
     @pick="addTarget"
   />
+
+  <Toaster position="bottom-center" :duration="2500" />
 </template>

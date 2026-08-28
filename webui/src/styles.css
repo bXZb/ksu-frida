@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "vue-sonner/style.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -116,16 +117,6 @@
   margin-bottom: 4px;
 }
 
-.field { margin-top: 10px; }
-.field label {
-  display: block;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted-foreground);
-  margin-bottom: 4px;
-}
-
 input[type="text"],
 input[type="number"],
 select,
@@ -148,7 +139,7 @@ textarea {
 
 .json-editor { min-height: 240px; }
 
-.ghost, .solid, .quiet {
+.ghost, .solid {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 12px;
@@ -162,11 +153,6 @@ textarea {
   border-color: var(--primary);
   color: var(--primary-foreground);
   font-weight: 600;
-}
-
-.quiet {
-  background: transparent;
-  color: var(--muted-foreground);
 }
 
 .actions {
@@ -183,65 +169,6 @@ textarea {
   margin-top: 10px;
   font-size: 13px;
   color: var(--muted-foreground);
-}
-
-.empty {
-  text-align: center;
-  color: var(--muted-foreground);
-  padding: 36px 12px;
-}
-
-.sheet {
-  position: fixed;
-  inset: 0;
-  background: rgba(8, 10, 9, 0.78);
-  z-index: 20;
-}
-
-.sheet-card {
-  position: fixed;
-  left: 50%;
-  bottom: 0;
-  transform: translateX(-50%);
-  width: min(560px, 100%);
-  min-width: 0;
-  max-height: 82vh;
-  background: var(--card);
-  border-top: 1px solid var(--border);
-  border-radius: 16px 16px 0 0;
-  padding: 16px 16px calc(16px + var(--safe-bottom));
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  z-index: 21;
-  outline: none;
-}
-
-.sheet-list {
-  overflow: auto;
-  min-height: 180px;
-}
-
-.app-hit {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  text-align: left;
-  background: transparent;
-  border: 0;
-  border-bottom: 1px solid var(--border);
-  padding: 10px 4px;
-  font: inherit;
-  color: inherit;
-}
-
-.seg { display: flex; gap: 6px; }
-.seg button { flex: 1; padding: 8px; }
-.seg button.active {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: var(--primary-foreground);
 }
 
 .scan {
