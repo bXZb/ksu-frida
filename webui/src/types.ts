@@ -1,5 +1,6 @@
 export type ChildMode = "freeze" | "kill" | "inject";
 export type AppFilter = "user" | "system" | "all";
+export type TargetFilter = "all" | "enabled" | "disabled";
 export type Tab = "targets" | "gadget";
 export type GadgetJsonStatus = "ok" | "missing" | "invalid";
 

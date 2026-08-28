@@ -1,4 +1,4 @@
-import { computed, reactive, ref } from "vue";
+import { computed, nextTick, reactive, ref, watch } from "vue";
 import {
   CONFIG_PATH,
   DEFAULT_GADGET_CONFIG,
@@ -16,6 +16,7 @@ import type {
   GadgetJsonStatus,
   Tab,
   Target,
+  TargetFilter,
 } from "../types";
 
 function prettyJson(value: unknown): string {
@@ -88,6 +89,21 @@ export function useFrida() {
   const installing = ref(false);
   const clearLibsOnGadgetChange = ref(false);
   const busy = ref(false);
+  const dirty = ref(false);
+  const targetFilter = ref<TargetFilter>("all");
+  let suppressDirty = false;
+
+  watch(config, () => {
+    if (!suppressDirty) dirty.value = true;
+  }, { deep: true });
+
+  function resetDirty(): void {
+    suppressDirty = true;
+    dirty.value = false;
+    void nextTick(() => {
+      suppressDirty = false;
+    });
+  }
 
   const filteredApps = computed(() => {
     const q = pickerQuery.value.trim().toLowerCase();
@@ -96,6 +112,16 @@ export function useFrida() {
       return !q || pkg.toLowerCase().includes(q) || label.includes(q);
     });
   });
+
+  const filteredTargets = computed(() =>
+    config.targets.filter((t) =>
+      targetFilter.value === "all"
+        ? true
+        : targetFilter.value === "enabled"
+          ? t.enabled
+          : !t.enabled,
+    ),
+  );
 
   function labelOf(pkg: string): string {
     return labels[pkg] || pkg;
@@ -127,11 +153,16 @@ export function useFrida() {
       config.targets = [];
     }
     if (stripped) await writeConfig();
+    resetDirty();
   }
 
   async function saveConfig(): Promise<void> {
-    if (await writeConfig()) toast("Config saved");
-    else toast("Save failed");
+    if (await writeConfig()) {
+      resetDirty();
+      toast("Config saved");
+    } else {
+      toast("Save failed");
+    }
   }
 
   async function loadGadgetConfig(): Promise<void> {
@@ -334,10 +365,11 @@ export function useFrida() {
     pickerOpen.value = false;
   }
 
-  function removeTarget(index: number): void {
-    const pkg = config.targets[index]?.app_name;
+  function removeTarget(pkg: string): void {
+    const index = config.targets.findIndex((t) => t.app_name === pkg);
+    if (index === -1) return;
     config.targets.splice(index, 1);
-    if (pkg) delete expanded[pkg];
+    delete expanded[pkg];
   }
 
   function toggleExpand(pkg: string): void {
@@ -375,6 +407,9 @@ export function useFrida() {
     pickerOpen,
     pickerQuery,
     filteredApps,
+    dirty,
+    targetFilter,
+    filteredTargets,
     gadgetInstalled,
     gadgetDetail,
     gadgetJson,

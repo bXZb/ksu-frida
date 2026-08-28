@@ -12,10 +12,15 @@ function initial(label: string): string {
 <template>
   <img
     v-if="!failed"
-    class="ico"
+    class="bg-secondary size-9 shrink-0 rounded-lg object-cover"
     :src="`ksu://icon/${props.pkg}`"
     :alt="label"
     @error="failed = true"
   />
-  <div v-else class="ico fallback">{{ initial(label) }}</div>
+  <div
+    v-else
+    class="bg-secondary text-primary flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold"
+  >
+    {{ initial(label) }}
+  </div>
 </template>

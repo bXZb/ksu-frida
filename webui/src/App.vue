@@ -17,6 +17,9 @@ const {
   pickerOpen,
   pickerQuery,
   filteredApps,
+  dirty,
+  targetFilter,
+  filteredTargets,
   gadgetInstalled,
   gadgetDetail,
   gadgetJson,
@@ -86,19 +89,39 @@ onMounted(() => {
           <Button size="sm" @click="openPicker">+ Add app</Button>
         </div>
 
-        <div v-if="!config.targets.length" class="empty">
-          <strong>No probes yet</strong>
+        <div v-if="config.targets.length" class="flex items-center gap-1.5">
+          <button
+            v-for="f in (['all', 'enabled', 'disabled'] as const)"
+            :key="f"
+            type="button"
+            class="cursor-pointer rounded-full border px-2.5 py-1 text-[11px] transition-colors"
+            :class="
+              targetFilter === f
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            "
+            @click="targetFilter = f"
+          >
+            {{ f }}
+          </button>
+        </div>
+
+        <div
+          v-if="!config.targets.length"
+          class="text-muted-foreground rounded-xl border border-dashed px-4 py-10 text-center text-sm"
+        >
+          <p class="text-foreground mb-1 font-semibold">No probes yet</p>
           Add an app, then install a gadget on the other tab.
         </div>
 
         <TargetCard
-          v-for="(target, index) in config.targets"
+          v-for="target in filteredTargets"
           :key="target.app_name"
           :target="target"
           :label="labelOf(target.app_name)"
           :open="Boolean(expanded[target.app_name])"
           @toggle="toggleExpand(target.app_name)"
-          @remove="removeTarget(index)"
+          @remove="removeTarget"
         />
       </TabsContent>
 
@@ -128,7 +151,14 @@ onMounted(() => {
       class="sticky bottom-0 -mx-4 mt-3 flex gap-2 border-t bg-background/80 px-4 pt-3 pb-1 backdrop-blur-md"
     >
       <Button class="flex-1" variant="outline" :disabled="busy" @click="reload">Reload</Button>
-      <Button class="flex-1" :disabled="busy" @click="saveAll">Save</Button>
+      <Button class="relative flex-1" :disabled="busy" @click="saveAll">
+        Save
+        <span
+          v-if="dirty"
+          class="bg-foreground ring-background absolute top-1 right-2 size-1.5 rounded-full ring-2"
+          aria-label="Unsaved changes"
+        />
+      </Button>
     </footer>
   </div>
 
