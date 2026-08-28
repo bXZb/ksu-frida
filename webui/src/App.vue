@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
-import { TabsContent, TabsList, TabsRoot, TabsTrigger } from "reka-ui";
 import AppPicker from "./components/AppPicker.vue";
 import GadgetPanel from "./components/GadgetPanel.vue";
 import TargetCard from "./components/TargetCard.vue";
 import { useFrida } from "./composables/useFrida";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const {
   tab,
@@ -45,33 +47,43 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="shell">
-    <header class="mast">
-      <div>
-        <div class="wordmark">Ksu<span>Frida</span></div>
-        <p class="lede">Gadget injection</p>
+  <div
+    class="mx-auto flex min-h-dvh w-full min-w-0 max-w-xl flex-col px-4 pt-[calc(0.875rem+var(--safe-top))] pb-[calc(0.75rem+var(--safe-bottom))]"
+  >
+    <header class="flex min-w-0 items-end justify-between gap-3 border-b pb-4">
+      <div class="min-w-0">
+        <h1 class="truncate text-[22px] leading-tight font-bold tracking-tight">
+          Ksu<span class="text-primary">Frida</span>
+        </h1>
+        <p class="mt-1 text-[11px] tracking-[0.14em] uppercase text-muted-foreground">
+          Gadget injection
+        </p>
       </div>
       <button
-        class="chip"
-        :class="gadgetInstalled ? 'live' : 'missing'"
         type="button"
+        class="hover:bg-accent inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border bg-card px-2.5 py-1.5 font-mono text-[11px] transition-colors"
         @click="tab = 'gadget'"
       >
+        <span
+          class="size-1.5 rounded-full"
+          :class="gadgetInstalled ? 'bg-live animate-pulse' : 'bg-warn'"
+        />
         {{ gadgetInstalled ? "Live" : "Missing" }}
       </button>
     </header>
 
-    <TabsRoot v-model="tab" class="stage-tabs">
-    <TabsList class="tabs">
-      <TabsTrigger class="tab-trigger" value="targets">Targets</TabsTrigger>
-      <TabsTrigger class="tab-trigger" value="gadget">Gadget</TabsTrigger>
-    </TabsList>
+    <Tabs v-model="tab" class="mt-3 flex min-h-0 flex-1 flex-col">
+      <TabsList class="grid w-full grid-cols-2">
+        <TabsTrigger value="targets">Targets</TabsTrigger>
+        <TabsTrigger value="gadget">Gadget</TabsTrigger>
+      </TabsList>
 
-    <main class="stage">
-      <TabsContent value="targets" class="deck">
-        <div class="row">
-          <span class="lede" style="margin:0">{{ config.targets.length }} hooked</span>
-          <button class="solid" type="button" @click="openPicker">Add app</button>
+      <TabsContent value="targets" class="mt-3 flex flex-1 flex-col gap-2.5">
+        <div class="flex items-center justify-between gap-3">
+          <span class="text-[11px] tracking-[0.14em] uppercase text-muted-foreground">
+            {{ config.targets.length }} hooked
+          </span>
+          <Button size="sm" @click="openPicker">+ Add app</Button>
         </div>
 
         <div v-if="!config.targets.length" class="empty">
@@ -90,32 +102,33 @@ onMounted(() => {
         />
       </TabsContent>
 
-      <TabsContent value="gadget">
-      <GadgetPanel
-        :installed="gadgetInstalled"
-        :detail="gadgetDetail"
-        :json="gadgetJson"
-        :json-status="gadgetJsonStatus"
-        :path="gadgetPath"
-        :scan="gadgetScan"
-        :scanning="scanning"
-        :installing="installing"
-        :clear-libs="clearLibsOnGadgetChange"
-        @update:json="gadgetJson = $event"
-        @update:path="gadgetPath = $event"
-        @update:clear-libs="clearLibsOnGadgetChange = $event"
-        @scan="scanGadgetCandidates"
-        @install="installGadget"
-        @remove="removeGadget"
-        @pick="gadgetPath = $event"
-      />
+      <TabsContent value="gadget" class="mt-3">
+        <GadgetPanel
+          :installed="gadgetInstalled"
+          :detail="gadgetDetail"
+          :json="gadgetJson"
+          :json-status="gadgetJsonStatus"
+          :path="gadgetPath"
+          :scan="gadgetScan"
+          :scanning="scanning"
+          :installing="installing"
+          :clear-libs="clearLibsOnGadgetChange"
+          @update:json="gadgetJson = $event"
+          @update:path="gadgetPath = $event"
+          @update:clear-libs="clearLibsOnGadgetChange = $event"
+          @scan="scanGadgetCandidates"
+          @install="installGadget"
+          @remove="removeGadget"
+          @pick="gadgetPath = $event"
+        />
       </TabsContent>
-    </main>
-    </TabsRoot>
+    </Tabs>
 
-    <footer class="dock">
-      <button class="ghost" type="button" :disabled="busy" @click="reload">Reload</button>
-      <button class="solid" type="button" :disabled="busy" @click="saveAll">Save</button>
+    <footer
+      class="sticky bottom-0 -mx-4 mt-3 flex gap-2 border-t bg-background/80 px-4 pt-3 pb-1 backdrop-blur-md"
+    >
+      <Button class="flex-1" variant="outline" :disabled="busy" @click="reload">Reload</Button>
+      <Button class="flex-1" :disabled="busy" @click="saveAll">Save</Button>
     </footer>
   </div>
 
