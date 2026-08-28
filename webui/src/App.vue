@@ -85,7 +85,10 @@ onMounted(() => {
         <TabsTrigger value="gadget">Gadget</TabsTrigger>
       </TabsList>
 
-      <TabsContent value="targets" class="mt-3 flex flex-1 flex-col gap-2.5">
+      <TabsContent
+        value="targets"
+        class="mt-3 flex flex-1 flex-col gap-2.5 data-[state=active]:animate-in data-[state=active]:fade-in-0 data-[state=active]:duration-200"
+      >
         <div class="flex items-center justify-between gap-3">
           <span class="text-[11px] tracking-[0.14em] uppercase text-muted-foreground">
             {{ config.targets.length }} hooked
@@ -132,7 +135,10 @@ onMounted(() => {
         />
       </TabsContent>
 
-      <TabsContent value="gadget" class="mt-3">
+      <TabsContent
+        value="gadget"
+        class="mt-3 data-[state=active]:animate-in data-[state=active]:fade-in-0 data-[state=active]:duration-200"
+      >
         <GadgetPanel
           :installed="gadgetInstalled"
           :detail="gadgetDetail"

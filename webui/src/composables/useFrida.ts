@@ -62,7 +62,6 @@ function stripDemo(cfg: AppConfig): AppConfig {
 }
 
 export function useFrida() {
-  const available = true;
   const tab = ref<Tab>("targets");
   const config = reactive<AppConfig>({ targets: [] });
   const labels = reactive<Record<string, string>>({});
