@@ -83,6 +83,14 @@ export function useFrida() {
   const gadgetDetail = ref("Checking…");
   const gadgetJson = ref(prettyJson(DEFAULT_GADGET_CONFIG));
   const gadgetJsonStatus = ref<GadgetJsonStatus>("missing");
+  const gadgetJsonError = computed<string | null>(() => {
+    try {
+      parseGadgetJson(gadgetJson.value);
+      return null;
+    } catch (e) {
+      return e instanceof Error ? e.message : String(e);
+    }
+  });
   const gadgetPath = ref("");
   const gadgetScan = ref<string[]>([]);
   const scanning = ref(false);
@@ -184,24 +192,32 @@ export function useFrida() {
     }
   }
 
+  function formatGadgetJson(): void {
+    try {
+      gadgetJson.value = prettyJson(parseGadgetJson(gadgetJson.value));
+    } catch {
+      /* invalid — Save will surface the error */
+    }
+  }
+
   async function saveGadgetConfig(): Promise<boolean> {
     let pretty: string;
     try {
       pretty = prettyJson(parseGadgetJson(gadgetJson.value));
     } catch (e) {
       gadgetJsonStatus.value = "invalid";
-      toast(`Invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
+      toast.error(`Invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
       return false;
     }
     gadgetJson.value = pretty;
     const r = await exec(`echo ${shellQuote(pretty)} > ${GADGET_CONFIG_PATH} && chmod 644 ${GADGET_CONFIG_PATH}`);
     if (r.errno === 0) {
       gadgetJsonStatus.value = "ok";
-      toast("Gadget config saved");
+      toast.success("Gadget config saved");
       return true;
     }
     gadgetJsonStatus.value = "invalid";
-    toast(`Failed: ${r.stderr}`);
+    toast.error(`Failed: ${r.stderr}`);
     return false;
   }
 
@@ -268,10 +284,10 @@ export function useFrida() {
     const r = await exec(cmd);
     installing.value = false;
     if (r.errno === 0 && (r.stdout || "").includes("OK")) {
-      toast("Gadget installed");
+      toast.success("Gadget installed");
       await maybeClearLibraries();
     } else {
-      toast(`Install failed: ${(r.stderr || r.stdout || "unknown").trim()}`);
+      toast.error(`Install failed: ${(r.stderr || r.stdout || "unknown").trim()}`);
     }
     await refreshGadgetBinary();
   }
@@ -279,10 +295,10 @@ export function useFrida() {
   async function removeGadget(): Promise<void> {
     const r = await exec(`rm -f ${GADGET_BIN_PATH}`);
     if (r.errno === 0) {
-      toast("Gadget removed");
+      toast.success("Gadget removed");
       await maybeClearLibraries();
     } else {
-      toast(`Remove failed: ${r.stderr}`);
+      toast.error(`Remove failed: ${r.stderr}`);
     }
     await refreshGadgetBinary();
   }
@@ -417,6 +433,8 @@ export function useFrida() {
     gadgetDetail,
     gadgetJson,
     gadgetJsonStatus,
+    gadgetJsonError,
+    formatGadgetJson,
     gadgetPath,
     gadgetScan,
     scanning,

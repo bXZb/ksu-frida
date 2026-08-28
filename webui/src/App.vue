@@ -26,6 +26,8 @@ const {
   gadgetDetail,
   gadgetJson,
   gadgetJsonStatus,
+  gadgetJsonError,
+  formatGadgetJson,
   gadgetPath,
   gadgetScan,
   scanning,
@@ -136,6 +138,7 @@ onMounted(() => {
           :detail="gadgetDetail"
           :json="gadgetJson"
           :json-status="gadgetJsonStatus"
+          :json-error="gadgetJsonError"
           :path="gadgetPath"
           :scan="gadgetScan"
           :scanning="scanning"
@@ -144,6 +147,7 @@ onMounted(() => {
           @update:json="gadgetJson = $event"
           @update:path="gadgetPath = $event"
           @update:clear-libs="clearLibsOnGadgetChange = $event"
+          @format="formatGadgetJson"
           @scan="scanGadgetCandidates"
           @install="installGadget"
           @remove="removeGadget"
