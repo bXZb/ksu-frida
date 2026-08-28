@@ -138,6 +138,7 @@ void inject_lib(std::string const &lib_path, std::string const &logContext) {
     void *handle = xdl_open(lib_path.c_str(), XDL_TRY_FORCE_LOAD);
     if (handle) {
         LOGI("%sInjected %s with handle %p", logContext.c_str(), lib_path.c_str(), handle);
+        remap_lib(lib_path);
         return;
     }
 
