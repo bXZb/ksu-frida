@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { FolderSearch, HardDriveDownload, Loader2Icon, Trash2 } from "@lucide/vue";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -95,14 +96,18 @@ const jsonValid = computed(() => props.jsonError === null);
         </div>
 
         <div class="grid grid-cols-3 gap-2">
-          <Button variant="outline" size="sm" :disabled="scanning" @click="emit('scan')">
-            {{ scanning ? "Scanning…" : "Scan" }}
+          <Button variant="outline" size="sm" class="px-2 text-xs" :disabled="scanning" @click="emit('scan')">
+            <Loader2Icon v-if="scanning" class="size-4 animate-spin" />
+            <FolderSearch v-else class="size-4" />
+            Scan
           </Button>
 
           <AlertDialog v-if="installed" v-model:open="replaceOpen">
             <AlertDialogTrigger as-child>
-              <Button size="sm" :disabled="installing">
-                {{ installing ? "Installing…" : "Replace" }}
+              <Button size="sm" class="px-2 text-xs" :disabled="installing">
+                <Loader2Icon v-if="installing" class="size-4 animate-spin" />
+                <HardDriveDownload v-else class="size-4" />
+                Replace
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -120,13 +125,16 @@ const jsonValid = computed(() => props.jsonError === null);
             </AlertDialogContent>
           </AlertDialog>
 
-          <Button v-else size="sm" :disabled="installing" @click="emit('install')">
-            {{ installing ? "Installing…" : "Install" }}
+          <Button v-else size="sm" class="px-2 text-xs" :disabled="installing" @click="emit('install')">
+            <Loader2Icon v-if="installing" class="size-4 animate-spin" />
+            <HardDriveDownload v-else class="size-4" />
+            Install
           </Button>
 
           <AlertDialog>
             <AlertDialogTrigger as-child>
-              <Button variant="ghost" size="sm" class="text-destructive hover:text-destructive">
+              <Button variant="ghost" size="sm" class="px-2 text-xs text-destructive hover:text-destructive">
+                <Trash2 class="size-4" />
                 Remove
               </Button>
             </AlertDialogTrigger>
