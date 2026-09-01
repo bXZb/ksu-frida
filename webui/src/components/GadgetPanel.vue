@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { FolderSearch, HardDriveDownload, Trash2 } from "@lucide/vue";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -95,16 +94,14 @@ const jsonValid = computed(() => props.jsonError === null);
           </button>
         </div>
 
-        <div class="flex flex-wrap gap-2">
+        <div class="grid grid-cols-3 gap-2">
           <Button variant="outline" size="sm" :disabled="scanning" @click="emit('scan')">
-            <FolderSearch class="size-4" />
             {{ scanning ? "Scanning…" : "Scan" }}
           </Button>
 
           <AlertDialog v-if="installed" v-model:open="replaceOpen">
             <AlertDialogTrigger as-child>
               <Button size="sm" :disabled="installing">
-                <HardDriveDownload class="size-4" />
                 {{ installing ? "Installing…" : "Replace" }}
               </Button>
             </AlertDialogTrigger>
@@ -124,14 +121,12 @@ const jsonValid = computed(() => props.jsonError === null);
           </AlertDialog>
 
           <Button v-else size="sm" :disabled="installing" @click="emit('install')">
-            <HardDriveDownload class="size-4" />
             {{ installing ? "Installing…" : "Install" }}
           </Button>
 
           <AlertDialog>
             <AlertDialogTrigger as-child>
               <Button variant="ghost" size="sm" class="text-destructive hover:text-destructive">
-                <Trash2 class="size-4" />
                 Remove
               </Button>
             </AlertDialogTrigger>
@@ -178,20 +173,26 @@ const jsonValid = computed(() => props.jsonError === null);
         </div>
       </CardHeader>
       <CardContent class="space-y-2">
-        <Textarea
-          class="min-h-56 font-mono text-xs"
-          spellcheck="false"
-          :model-value="json"
-          @update:model-value="emit('update:json', String($event))"
-        />
-        <p v-if="!jsonValid" class="text-destructive font-mono text-xs">
-          {{ jsonError }}
-        </p>
-        <div class="flex gap-2">
-          <Button variant="outline" size="sm" :disabled="!jsonValid" @click="emit('format')">
+        <div class="relative">
+          <Textarea
+            class="min-h-56 font-mono text-xs"
+            spellcheck="false"
+            :model-value="json"
+            @update:model-value="emit('update:json', String($event))"
+          />
+          <Button
+            variant="outline"
+            size="xs"
+            class="absolute top-2 right-2 bg-background/80 shadow-xs backdrop-blur-sm"
+            :disabled="!jsonValid"
+            @click="emit('format')"
+          >
             Format
           </Button>
         </div>
+        <p v-if="!jsonValid" class="text-destructive font-mono text-xs">
+          {{ jsonError }}
+        </p>
       </CardContent>
     </Card>
   </div>
