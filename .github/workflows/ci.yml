@@ -8,6 +8,7 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build:
@@ -25,7 +26,7 @@ jobs:
       - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654
         with:
           distribution: temurin
-          java-version: 11
+          java-version: 17
           cache: gradle
 
       - uses: actions/setup-node@v4
@@ -42,8 +43,8 @@ jobs:
       - name: Get Module Info
         id: module-version
         run: |
-          MODULE_VERSION=$(grep 'moduleVersion =' module.gradle | awk -F'"' '{print $2}')
-          MODULE_VERSION_CODE=$(grep 'moduleVersionCode =' module.gradle | awk -F'= ' '{print $2}')
+          MODULE_VERSION=$(sed -n 's/^val moduleVersion = "\(.*\)"$/\1/p' module/build.gradle.kts)
+          MODULE_VERSION_CODE=$(sed -n 's/^val moduleVersionCode = "\(.*\)"$/\1/p' module/build.gradle.kts)
           echo "version=$MODULE_VERSION" >> "$GITHUB_OUTPUT"
           echo "versionCode=$MODULE_VERSION_CODE" >> "$GITHUB_OUTPUT"
 
@@ -65,23 +66,3 @@ jobs:
           name: KsuFrida ${{ steps.module-version.outputs.version }}
           generate_release_notes: true
           files: out/KsuFrida-${{ steps.module-version.outputs.version }}.zip
-
-      - name: Update update.json
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          set -euo pipefail
-
-          VERSION=${{ steps.module-version.outputs.version }}
-          VERSION_CODE=${{ steps.module-version.outputs.versionCode }}
-
-          printf '{\n    "version": "%s",\n    "versionCode": %s,\n    "zipUrl": "https://github.com/gorkemgun/ksu-frida/releases/download/%s/KsuFrida-%s.zip",\n    "changelog": "https://raw.githubusercontent.com/gorkemgun/ksu-frida/main/changelog.md"\n}\n' "$VERSION" "$VERSION_CODE" "$VERSION" "$VERSION" > update.json
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git checkout main
-          git add update.json
-          git commit -m "update update.json for ${VERSION}" || exit 0
-
-          git remote set-url origin "https://x-access-token:${{ secrets.PAT_PUSH_TOKEN }}@github.com/${{ github.repository }}.git"
-          git push origin HEAD:main

@@ -6,6 +6,7 @@ import {
   GADGET_BIN_PATH,
   GADGET_CONFIG_PATH,
   GADGET_DIR,
+  MODULE_RUNTIME_DIR,
   defaultLibs,
 } from "../constants";
 import { exec, getPackagesInfo, listPackages, shellQuote, toast } from "../ksu";
@@ -138,12 +139,19 @@ export function useFrida() {
 
   async function writeConfig(): Promise<boolean> {
     const json = prettyJson(config);
-    const r = await exec(`echo ${shellQuote(json)} > ${CONFIG_PATH} && chmod 644 ${CONFIG_PATH}`);
+    const r = await exec(
+      `mkdir -p ${GADGET_DIR} ${MODULE_RUNTIME_DIR} && ` +
+        `echo ${shellQuote(json)} > ${CONFIG_PATH} && chmod 644 ${CONFIG_PATH} && ` +
+        `cp -f ${CONFIG_PATH} ${MODULE_RUNTIME_DIR}/config.json && chmod 644 ${MODULE_RUNTIME_DIR}/config.json`,
+    );
     return r.errno === 0;
   }
 
   async function loadConfig(): Promise<void> {
-    const r = await exec(`cat ${CONFIG_PATH}`);
+    let r = await exec(`cat ${CONFIG_PATH}`);
+    if (r.errno !== 0 || !r.stdout.trim()) {
+      r = await exec(`cat ${MODULE_RUNTIME_DIR}/config.json`);
+    }
     let stripped = false;
     if (r.errno === 0 && r.stdout.trim()) {
       try {
@@ -175,7 +183,10 @@ export function useFrida() {
   }
 
   async function loadGadgetConfig(): Promise<void> {
-    const r = await exec(`cat ${GADGET_CONFIG_PATH}`);
+    let r = await exec(`cat ${GADGET_CONFIG_PATH}`);
+    if (r.errno !== 0) {
+      r = await exec(`cat ${MODULE_RUNTIME_DIR}/libsecmon.config.so`);
+    }
     if (r.errno !== 0) {
       gadgetJsonStatus.value = "missing";
       gadgetJson.value = prettyJson(DEFAULT_GADGET_CONFIG);
@@ -209,7 +220,12 @@ export function useFrida() {
       return false;
     }
     gadgetJson.value = pretty;
-    const r = await exec(`echo ${shellQuote(pretty)} > ${GADGET_CONFIG_PATH} && chmod 644 ${GADGET_CONFIG_PATH}`);
+    const r = await exec(
+      `mkdir -p ${GADGET_DIR} ${MODULE_RUNTIME_DIR} && ` +
+        `echo ${shellQuote(pretty)} > ${GADGET_CONFIG_PATH} && chmod 644 ${GADGET_CONFIG_PATH} && ` +
+        `cp -f ${GADGET_CONFIG_PATH} ${MODULE_RUNTIME_DIR}/libsecmon.config.so && ` +
+        `chmod 644 ${MODULE_RUNTIME_DIR}/libsecmon.config.so`,
+    );
     if (r.errno === 0) {
       gadgetJsonStatus.value = "ok";
       toast.success("Gadget config saved");
@@ -222,7 +238,12 @@ export function useFrida() {
 
   async function refreshGadgetBinary(): Promise<void> {
     const r = await exec(
-      `if [ -f ${GADGET_BIN_PATH} ]; then stat -c '%s %y' ${GADGET_BIN_PATH} 2>/dev/null || ls -l ${GADGET_BIN_PATH}; else echo MISSING; fi`,
+      `if [ -f ${GADGET_BIN_PATH} ]; then ` +
+        `STAT=$(stat -c '%s %y' ${GADGET_BIN_PATH} 2>/dev/null || ls -l ${GADGET_BIN_PATH}); ` +
+        `EM=$(od -An -j18 -N2 -tu2 ${GADGET_BIN_PATH} 2>/dev/null | tr -d ' '); ` +
+        `case "$EM" in 183) ABI=arm64;; 40) ABI=arm;; 62) ABI=x86_64;; 3) ABI=x86;; *) ABI=elf-$EM;; esac; ` +
+        `echo "$STAT abi=$ABI"; ` +
+        `else echo MISSING; fi`,
     );
     const text = (r.stdout || "").trim();
     gadgetInstalled.value = r.errno === 0 && text.length > 0 && !text.startsWith("MISSING");
@@ -279,6 +300,8 @@ export function useFrida() {
       'chmod 644 "$DST"; ' +
       'HDR=$(od -An -N4 -tx1 "$DST" 2>/dev/null | tr -d \' \\n\'); ' +
       'if [ "$HDR" != "7f454c46" ]; then echo \'not an ELF .so\' >&2; rm -f "$DST"; exit 4; fi; ' +
+      `mkdir -p ${MODULE_RUNTIME_DIR}; cp -f "$DST" ${MODULE_RUNTIME_DIR}/libsecmon.so; ` +
+      `chmod 644 ${MODULE_RUNTIME_DIR}/libsecmon.so; ` +
       "echo OK";
     const r = await exec(cmd);
     installing.value = false;
@@ -292,7 +315,7 @@ export function useFrida() {
   }
 
   async function removeGadget(): Promise<void> {
-    const r = await exec(`rm -f ${GADGET_BIN_PATH}`);
+    const r = await exec(`rm -f ${GADGET_BIN_PATH} ${MODULE_RUNTIME_DIR}/libsecmon.so`);
     if (r.errno === 0) {
       toast.success("Gadget removed");
       await maybeClearLibraries();

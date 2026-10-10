@@ -12,12 +12,12 @@ Frida gadget injection module for KernelSU/Magisk via Zygisk.
 ## Prerequisites
 
 - Rooted device with KernelSU or Magisk
-- Zygisk enabled
+- Zygisk enabled (on KernelSU this is typically [ZygiskNext](https://github.com/Dr-TSNG/ZygiskNext))
 - A Frida **gadget** shared library matching the target ABI (`android-arm` / `android-arm64`). This is not `frida-server`.
 
 ## Quick Start
 
-1. Download the latest release from the [Releases](https://github.com/gorkemgun/ksu-frida/releases) page
+1. Download the latest release from the [Releases](https://github.com/bXZb/ksu-frida/releases) page
 2. Install the ZIP via KernelSU/Magisk Manager
 3. Reboot
 4. Install a gadget (see below)
@@ -42,6 +42,8 @@ adb shell su -c 'chmod 644 /data/local/tmp/libsec/libsecmon.so'
 
 `.so.xz` files are accepted in WebUI if `busybox`/`unxz` is present. Reinstalling the module does **not** unpack or overwrite `libsecmon.so`.
 
+Use a **patched gadget** (rusda, ajeossida, Phantom-Frida, strongR/hluda, …) if the target scans for stock Frida strings, thread names, or `memfd` names. KsuFrida only loads and remaps whatever `.so` you install; it does not patch Frida itself.
+
 ### Option A: WebUI (KernelSU only)
 
 Open KernelSU Manager → Modules → KsuFrida → WebUI.
@@ -57,11 +59,11 @@ Open KernelSU Manager → Modules → KsuFrida → WebUI.
 adb shell su -c 'printf "%s\n" "{ \"targets\": [] }" > /data/local/tmp/libsec/config.json'
 ```
 
-Then add a real package in WebUI, or edit `config.json` (see [advanced config](docs/advanced_config.md)). `config.json.example` is a schema stub with an empty `targets` array — do not treat it as a live target list.
+Then add a real package in WebUI, or edit `config.json` (see [advanced config](docs/advanced_config.md)).
 
 ### Connecting
 
-The default gadget config uses **listen mode** on port 27042 with `on_load: resume` (so the app is not blocked until a Frida client attaches). After opening the target app:
+The default gadget config uses **listen mode** on `127.0.0.1:27042` with `on_load: resume` (so the app is not blocked until a Frida client attaches). After opening the target app:
 
 ```shell
 adb forward tcp:27042 tcp:27042
@@ -72,7 +74,7 @@ Stealth / patched gadgets often rename `Gadget`. Use `frida-ps -H 127.0.0.1:2704
 
 ## Configuration
 
-Config files are stored at `/data/local/tmp/libsec/`:
+Config files are stored at `/data/local/tmp/libsec/` (mirrored under `/data/adb/modules/ksufrida/runtime/`):
 
 | File | Purpose |
 |------|---------|
@@ -104,9 +106,11 @@ Example `config.json`:
 
 Leave `injected_libraries` empty to inject nothing for that target.
 
+`kernel_assisted_evasion` remaps the Zygisk injector mapping after the gadget starts. It does not talk to a kernel driver.
+
 ## Building
 
-Requires JDK 11+, Android NDK, and Node.js 20+ (WebUI is Vue 3, built into `webroot/` at assemble time).
+Requires JDK 17+, Android NDK, and Node.js 20+ (WebUI is Vue 3, built into `webroot/` at assemble time).
 
 ```shell
 ./gradlew :module:assembleRelease
@@ -123,11 +127,6 @@ npm run dev
 ```
 
 `npm run dev` has no `window.ksu` — open the built page from KernelSU Manager to talk to the device.
-
-To build, install and reboot directly:
-```shell
-./gradlew :module:flashAndRebootZygiskRelease
-```
 
 ## Credits
 

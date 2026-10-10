@@ -9,7 +9,8 @@ Both configurations are supported with the advanced config taking precedence in 
 ## Config File
 
 This module is configured via a json config located at `/data/local/tmp/libsec/config.json`.
-A first install writes `{ "targets": [] }` if that file does not already exist. `config.json.example` is the same empty stub — it is not a live demo target.
+A first install writes `{ "targets": [] }` if that file does not already exist.
+A copy is also kept at `/data/adb/modules/ksufrida/runtime/` and restored after boot if tmp was wiped.
 
 Prefer adding apps from the KernelSU WebUI. To start from a blank file manually:
 ```shell
@@ -59,7 +60,10 @@ If set to false, then this module will ignore this configuration.
 This is useful if you want to temporarily disable a target while maintaining the config.
 
 ### kernel_assisted_evasion
-Enables kernel-assisted evasion for the target process (KSIE). Requires KernelSU with compatible kernel patches.
+When true, remap the Zygisk injector itself after the gadget has started so its
+path no longer appears in `/proc/self/maps`. This is userspace-only (no kernel
+driver is shipped). Optional; defaults to `false` if omitted. Gadget libraries
+are remapped regardless of this flag.
 
 ### start_up_delay_ms
 Injection of libraries is delayed by this amount in milliseconds.
