@@ -2,7 +2,6 @@
 
 #include <fstream>
 #include <optional>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -48,20 +47,26 @@ static std::optional<child_gating_config> deserialize_child_gating_config(const 
     }
 
     child_gating_config result = {};
+    result.enabled = false;
+    result.mode = "freeze";
 
-    auto &enabled = doc["enabled"];
-    if (!enabled.IsBool()) {
-        LOGE("invalid config: expected child_gating.enabled members to be a bool");
-        return std::nullopt;
+    if (doc.HasMember("enabled")) {
+        auto &enabled = doc["enabled"];
+        if (!enabled.IsBool()) {
+            LOGE("invalid config: expected child_gating.enabled members to be a bool");
+            return std::nullopt;
+        }
+        result.enabled = enabled.GetBool();
     }
-    result.enabled = enabled.GetBool();
 
-    auto &mode = doc["mode"];
-    if (!mode.IsString()) {
-        LOGE("invalid config: expected child_gating.mode members to be a string");
-        return std::nullopt;
+    if (doc.HasMember("mode")) {
+        auto &mode = doc["mode"];
+        if (!mode.IsString()) {
+            LOGE("invalid config: expected child_gating.mode members to be a string");
+            return std::nullopt;
+        }
+        result.mode = mode.GetString();
     }
-    result.mode = mode.GetString();
 
     if (doc.HasMember("injected_libraries")) {
         auto injected_libraries = deserialize_libraries(doc["injected_libraries"]);
@@ -81,6 +86,9 @@ static std::optional<target_config> deserialize_target_config(const rapidjson::V
     }
 
     target_config result = {};
+    result.enabled = true;
+    result.start_up_delay_ms = 0;
+    result.remap_injector = false;
 
     auto &app_name = doc["app_name"];
     if (!app_name.IsString()) {
@@ -89,33 +97,48 @@ static std::optional<target_config> deserialize_target_config(const rapidjson::V
     }
     result.app_name = app_name.GetString();
 
-    auto &enabled = doc["enabled"];
-    if (!enabled.IsBool()) {
-        LOGE("invalid config: expected targets.enabled members to be a bool");
-        return std::nullopt;
+    if (doc.HasMember("enabled")) {
+        auto &enabled = doc["enabled"];
+        if (!enabled.IsBool()) {
+            LOGE("invalid config: expected targets.enabled members to be a bool");
+            return std::nullopt;
+        }
+        result.enabled = enabled.GetBool();
     }
-    result.enabled = enabled.GetBool();
 
-    auto &kernel_assisted_evasion = doc["kernel_assisted_evasion"];
-    if (!kernel_assisted_evasion.IsBool()) {
-        LOGE("invalid config: expected kernel_assisted_evasion members to be a bool");
-        return std::nullopt;
+    // remap_injector wins if both keys are present; kernel_assisted_evasion is the old name.
+    if (doc.HasMember("remap_injector")) {
+        auto &remap_injector = doc["remap_injector"];
+        if (!remap_injector.IsBool()) {
+            LOGE("invalid config: expected remap_injector members to be a bool");
+            return std::nullopt;
+        }
+        result.remap_injector = remap_injector.GetBool();
+    } else if (doc.HasMember("kernel_assisted_evasion")) {
+        auto &kernel_assisted_evasion = doc["kernel_assisted_evasion"];
+        if (!kernel_assisted_evasion.IsBool()) {
+            LOGE("invalid config: expected kernel_assisted_evasion members to be a bool");
+            return std::nullopt;
+        }
+        result.remap_injector = kernel_assisted_evasion.GetBool();
     }
-    result.kernel_assisted_evasion = kernel_assisted_evasion.GetBool();
 
-    auto &start_up_delay_ms = doc["start_up_delay_ms"];
-    if (!start_up_delay_ms.IsUint64()) {
-        LOGE("expected config target start_up_delay_ms to be an uint64");
-        return std::nullopt;
+    if (doc.HasMember("start_up_delay_ms")) {
+        auto &start_up_delay_ms = doc["start_up_delay_ms"];
+        if (!start_up_delay_ms.IsUint64()) {
+            LOGE("expected config target start_up_delay_ms to be an uint64");
+            return std::nullopt;
+        }
+        result.start_up_delay_ms = start_up_delay_ms.GetUint64();
     }
-    result.start_up_delay_ms = start_up_delay_ms.GetUint64();
 
-    auto &injected_libaries = doc["injected_libraries"];
-    auto deserialized_libraries = deserialize_libraries(injected_libaries);
-    if (!deserialized_libraries.has_value()) {
-        return std::nullopt;
+    if (doc.HasMember("injected_libraries")) {
+        auto deserialized_libraries = deserialize_libraries(doc["injected_libraries"]);
+        if (!deserialized_libraries.has_value()) {
+            return std::nullopt;
+        }
+        result.injected_libraries = deserialized_libraries.value();
     }
-    result.injected_libraries = deserialized_libraries.value();
 
     if (doc.HasMember("child_gating")) {
         auto child_gating = deserialize_child_gating_config(doc["child_gating"]);
@@ -128,77 +151,8 @@ static std::optional<target_config> deserialize_target_config(const rapidjson::V
     return result;
 }
 
-static std::vector<std::string> split(std::string const &str, char delimiter) {
-    std::vector<std::string> result;
-    std::stringstream ss(str);
-
-    std::string tmp;
-    while (getline(ss, tmp, delimiter)) {
-        result.push_back(tmp);
-    }
-
-    return result;
-}
-
-static std::vector<std::string> parse_injected_libraries(std::string const &module_dir) {
-    auto config_file_path = module_dir + "/injected_libraries";
-
-    std::ifstream config_file(config_file_path);
-    if (!config_file.is_open()) {
-        return {module_dir + "/libsecmon.so"};
-    }
-
-    std::vector<std::string> injected_libraries;
-
-    std::string libpath;
-    while (getline(config_file, libpath)) {
-        if (!libpath.empty()) {
-            injected_libraries.push_back(libpath);
-        }
-    }
-
-    config_file.close();
-
-    return injected_libraries;
-}
-
-static std::optional<target_config> load_simple_config(std::string const &module_dir, std::string const &app_name) {
-    std::ifstream config_file(module_dir + "/target_packages");
-    if (!config_file.is_open()) {
-        return std::nullopt;
-    }
-
-    std::string line;
-    while (getline(config_file, line)) {
-        if (line.empty()) {
-            continue;
-        }
-
-        auto splitted = split(line, ',');
-        if (splitted[0] != app_name) {
-            continue;
-        }
-
-        target_config cfg = {};
-        cfg.app_name = splitted[0];
-        cfg.enabled = true;
-        cfg.kernel_assisted_evasion = true;
-
-        if (splitted.size() >= 2) {
-            cfg.start_up_delay_ms = std::strtoul(splitted[1].c_str(), nullptr, 10);
-        }
-        cfg.injected_libraries = parse_injected_libraries(module_dir);
-
-        config_file.close();
-        return cfg;
-    }
-
-    config_file.close();
-    return std::nullopt;
-}
-
-static std::optional<target_config> load_advanced_config(std::string const &module_dir, std::string const &app_name) {
-    std::ifstream config_file(module_dir + "/config.json");
+static std::optional<target_config> load_advanced_config(std::string const &config_path, std::string const &app_name) {
+    std::ifstream config_file(config_path);
     if (!config_file.is_open()) {
         return std::nullopt;
     }
@@ -243,10 +197,12 @@ static std::optional<target_config> load_advanced_config(std::string const &modu
 }
 
 std::optional<target_config> load_config(std::string const &module_dir, std::string const &app_name) {
-    auto cfg = load_advanced_config(module_dir, app_name);
+    auto cfg = load_advanced_config(module_dir + "/config.json", app_name);
     if (cfg.has_value()) {
         return cfg;
     }
 
-    return load_simple_config(module_dir, app_name);
+    // Module-dir mirror used when /data/local/tmp was wiped (boot-completed.sh restores it
+    // asynchronously; this covers the first launch after a wipe).
+    return load_advanced_config("/data/adb/modules/ksufrida/runtime/config.json", app_name);
 }

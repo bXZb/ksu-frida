@@ -1,18 +1,21 @@
-*.iml
+# Gradle
 .gradle
-/local.properties
-/.idea
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+build
+.kotlin
+
+# Android / NDK
 local.properties
-/gadget/*
-!.gitkeep
-/.claude
+.cxx
+.externalNativeBuild
+
+# Module build output
 out
+
+# WebUI sources are tracked; dependencies and build output are not
 webui/node_modules
-template/magisk_module/webroot/index.html
-template/magisk_module/webroot/assets
-template/magisk_module/webroot/main.js
+template/magisk_module/webroot
+
+# IDE
+.idea
+*.iml
+.DS_Store

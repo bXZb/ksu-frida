@@ -1,9 +1,0 @@
-ext {
-    // Magisk Module
-    magiskModuleId = "ksufrida"
-    moduleName = "KsuFrida"
-    moduleAuthor = "gorkemgun"
-    moduleDescription = "Frida gadget injection module for KernelSU via Zygisk"
-    moduleVersion = "v1.9.32"
-    moduleVersionCode = 42
-}

@@ -18,6 +18,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 
 const props = defineProps<{
@@ -76,10 +83,15 @@ const confirmOpen = ref(false);
         <div class="overflow-hidden">
           <CardContent class="space-y-4 border-t px-3 pt-3">
             <div class="flex items-center justify-between gap-3">
-              <span class="text-[11px] tracking-[0.12em] uppercase text-muted-foreground">
-                Kernel evasion
+              <span class="min-w-0">
+                <span class="block text-[11px] tracking-[0.12em] uppercase text-muted-foreground">
+                  Remap injector
+                </span>
+                <span class="text-muted-foreground text-[11px]">
+                  Hide this module in maps after gadget starts
+                </span>
               </span>
-              <Switch v-model="target.kernel_assisted_evasion" />
+              <Switch v-model="target.remap_injector" />
             </div>
 
             <div class="space-y-1.5">

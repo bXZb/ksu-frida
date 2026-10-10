@@ -5,6 +5,7 @@ import AppPicker from "./components/AppPicker.vue";
 import GadgetPanel from "./components/GadgetPanel.vue";
 import TargetCard from "./components/TargetCard.vue";
 import { useFrida } from "./composables/useFrida";
+import { useSystemTheme } from "./composables/useSystemTheme";
 import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -47,6 +48,8 @@ const {
   removeTarget,
   toggleExpand,
 } = useFrida();
+
+useSystemTheme();
 
 const tabThumb = reactive({ x: 0, width: 0 });
 const tabThumbReady = ref(false);
@@ -235,5 +238,5 @@ onBeforeUnmount(() => {
     @pick="addTarget"
   />
 
-  <Toaster position="bottom-center" :duration="2500" />
+  <Toaster theme="system" position="bottom-center" :duration="2500" />
 </template>

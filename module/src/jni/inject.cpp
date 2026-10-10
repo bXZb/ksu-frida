@@ -1,5 +1,6 @@
 #include "inject.h"
 
+#include <dlfcn.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -133,21 +134,32 @@ static void unlink_staged(const std::string &staged_lib_path) {
     LOGI("Staged files removed");
 }
 
-// ── Injection ─────────────────────────────────────────────────────────────────
-void inject_lib(std::string const &lib_path, std::string const &logContext) {
+static void remap_injector() {
+    Dl_info info{};
+    if (dladdr(reinterpret_cast<void *>(check_and_inject), &info) == 0 || info.dli_fname == nullptr) {
+        return;
+    }
+    LOGI("Remapping injector %s", info.dli_fname);
+    remap_lib(info.dli_fname);
+}
+
+void inject_lib(std::string const &lib_path, std::string const &logContext, bool remap_now) {
     void *handle = xdl_open(lib_path.c_str(), XDL_TRY_FORCE_LOAD);
     if (handle) {
         LOGI("%sInjected %s with handle %p", logContext.c_str(), lib_path.c_str(), handle);
-        remap_lib(lib_path);
+        if (remap_now) {
+            remap_lib(lib_path);
+        }
         return;
     }
 
     auto xdl_err = dlerror();
-    // Fall back to standard dlopen.
     handle = dlopen(lib_path.c_str(), RTLD_NOW);
     if (handle) {
         LOGI("%sInjected %s with handle %p (dlopen fallback)", logContext.c_str(), lib_path.c_str(), handle);
-        remap_lib(lib_path);
+        if (remap_now) {
+            remap_lib(lib_path);
+        }
         return;
     }
 
@@ -162,26 +174,39 @@ static void inject_libs(target_config const &cfg, pid_t pid) {
         enable_child_gating(cfg.child_gating);
     }
 
-    if (cfg.kernel_assisted_evasion) {
-        LOGI("KSIE enabled for PID: %d", pid);
-    }
-
     delay_start_up(cfg.start_up_delay_ms);
+
+    std::vector<std::string> loaded;
+    std::vector<std::string> staged_paths;
 
     for (auto const &lib_path : cfg.injected_libraries) {
         std::string staged = stage_gadget(cfg.app_name, lib_path);
         std::string inject_path = staged.empty() ? lib_path : staged;
 
         LOGI("Injecting %s", inject_path.c_str());
-        inject_lib(inject_path, "");
-
+        inject_lib(inject_path, "", false);
+        loaded.push_back(inject_path);
         if (!staged.empty()) {
-            unlink_staged(staged);
+            staged_paths.push_back(staged);
         }
     }
 
-    // Allow Frida's JS engine to fully initialize before post-init cleanup.
+    // Let constructors (gadget listen thread, JS engine) finish before rewriting
+    // file-backed mappings. Remapping .text while the gadget is still starting
+    // has historically crashed Frida.
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    for (auto const &path : loaded) {
+        remap_lib(path);
+    }
+    for (auto const &staged : staged_paths) {
+        unlink_staged(staged);
+    }
+
+    if (cfg.remap_injector) {
+        LOGI("Remap injector enabled for PID %d (userspace maps hide; no kernel driver)", pid);
+        remap_injector();
+    }
 }
 
 bool check_and_inject(std::string const &app_name) {

@@ -3,6 +3,7 @@ SKIPUNZIP=1
 MODULE_ID=@MODULE_ID@
 
 TMP_MODULE_DIR=/data/local/tmp/libsec
+MIRROR_DIR="$MODPATH/runtime"
 
 if [ "$ARCH" != "arm" ] && [ "$ARCH" != "arm64" ] && [ "$ARCH" != "x86" ] && [ "$ARCH" != "x64" ]; then
   abort "! Unsupported platform: $ARCH"
@@ -23,6 +24,7 @@ fi
 ui_print "- Extracting module files"
 extract "$ZIPFILE" 'module.prop' "$MODPATH"
 extract "$ZIPFILE" 'uninstall.sh' "$MODPATH"
+extract "$ZIPFILE" 'boot-completed.sh' "$MODPATH"
 
 mkdir -p "$MODPATH/webroot/assets"
 extract "$ZIPFILE" 'webroot/index.html' "$MODPATH/webroot" true
@@ -50,8 +52,7 @@ fi
 
 ui_print "- Preparing runtime directory (gadget is not bundled)"
 mkdir -p "$TMP_MODULE_DIR"
-
-extract "$ZIPFILE" "config.json.example" "$TMP_MODULE_DIR" true
+mkdir -p "$MIRROR_DIR"
 
 if [ ! -f "$TMP_MODULE_DIR/config.json" ]; then
   ui_print "- Writing empty target list"
@@ -64,16 +65,20 @@ elif grep -q 'com.example.package' "$TMP_MODULE_DIR/config.json"; then
   fi
 fi
 
-DEFAULT_GADGET_CFG='{"interaction":{"type":"listen","address":"0.0.0.0","port":27042,"on_load":"resume"}}'
+DEFAULT_GADGET_CFG='{"interaction":{"type":"listen","address":"127.0.0.1","port":27042,"on_load":"resume"}}'
 OLD_DEFAULT_GADGET_CFG='{"interaction":{"type":"listen","address":"0.0.0.0","port":27042}}'
+OLD_RESUME_ALL_IFACES='{"interaction":{"type":"listen","address":"0.0.0.0","port":27042,"on_load":"resume"}}'
 
 if [ ! -f "$TMP_MODULE_DIR/libsecmon.config.so" ]; then
-  ui_print "- Writing default gadget config (listen + on_load resume)"
+  ui_print "- Writing default gadget config (listen localhost + on_load resume)"
   printf '%s\n' "$DEFAULT_GADGET_CFG" > "$TMP_MODULE_DIR/libsecmon.config.so"
 else
   CURRENT_GADGET_CFG=$(tr -d '[:space:]' < "$TMP_MODULE_DIR/libsecmon.config.so")
   if [ "$CURRENT_GADGET_CFG" = "$OLD_DEFAULT_GADGET_CFG" ]; then
     ui_print "- Updating stock gadget config to on_load resume"
+    printf '%s\n' "$DEFAULT_GADGET_CFG" > "$TMP_MODULE_DIR/libsecmon.config.so"
+  elif [ "$CURRENT_GADGET_CFG" = "$OLD_RESUME_ALL_IFACES" ]; then
+    ui_print "- Binding stock listen config to 127.0.0.1"
     printf '%s\n' "$DEFAULT_GADGET_CFG" > "$TMP_MODULE_DIR/libsecmon.config.so"
   fi
 fi
@@ -83,5 +88,14 @@ if [ ! -f "$TMP_MODULE_DIR/libsecmon.so" ]; then
   ui_print "  $TMP_MODULE_DIR/libsecmon.so"
 fi
 
+# Keep a module-dir mirror so boot-completed.sh can restore tmp after wipes.
+cp -f "$TMP_MODULE_DIR/config.json" "$MIRROR_DIR/config.json" 2>/dev/null || true
+cp -f "$TMP_MODULE_DIR/libsecmon.config.so" "$MIRROR_DIR/libsecmon.config.so" 2>/dev/null || true
+if [ -f "$TMP_MODULE_DIR/libsecmon.so" ]; then
+  cp -f "$TMP_MODULE_DIR/libsecmon.so" "$MIRROR_DIR/libsecmon.so"
+fi
+
 set_perm_recursive "$TMP_MODULE_DIR" 0 0 0755 0644
+set_perm_recursive "$MIRROR_DIR" 0 0 0755 0644
 set_perm_recursive "$MODPATH" 0 0 0755 0644
+set_perm "$MODPATH/boot-completed.sh" 0 0 0755

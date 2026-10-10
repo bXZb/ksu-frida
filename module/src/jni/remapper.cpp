@@ -1,103 +1,139 @@
 #include "remapper.h"
 
-#include <link.h>
+#include <errno.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 #include <sys/mman.h>
 
 #include <cinttypes>
-#include <cstdint>
-#include <cstdio>
 #include <string>
 #include <vector>
 
 #include "log.h"
 
-// Struct to hold a single entry in /proc/maps/
-// Format: 7ac49c2000(start)-7ac4a26000(end) r--p (permissions) 00000000(offset) 00:00 0 (dev) 1245 (inode) /apex/com.android.runtime/bin/linker64 (path) // NOLINT
-struct PROCMAPSINFO {
-    uintptr_t start, end, offset;
-    uint8_t perms;
-    ino_t inode;
-    char* dev;
-    char* path;
+struct MapEntry {
+    uintptr_t start;
+    uintptr_t end;
+    int perms;
+    std::string path;
 };
 
+static std::string basename_of(std::string path) {
+    auto deleted = path.find(" (deleted)");
+    if (deleted != std::string::npos) {
+        path.erase(deleted);
+    }
+    auto slash = path.find_last_of("/\\");
+    if (slash == std::string::npos) {
+        return path;
+    }
+    return path.substr(slash + 1);
+}
 
-std::vector<PROCMAPSINFO> get_modules_by_name(std::string mName) {
-    std::string process_maps_locations = "/proc/self/maps";
+static bool is_file_backed(const std::string &path) {
+    return !path.empty() && path[0] != '[';
+}
 
-    std::vector<PROCMAPSINFO> maps;
-
-    char buffer[512];
-    FILE *fp = fopen(process_maps_locations.c_str(), "re");
-
+static std::vector<MapEntry> get_modules_by_name(const std::string &lib_name) {
+    std::vector<MapEntry> maps;
+    FILE *fp = fopen("/proc/self/maps", "re");
     if (fp == nullptr) {
         return maps;
     }
 
+    char buffer[1024];
     while (fgets(buffer, sizeof(buffer), fp)) {
-        if (strstr(buffer, mName.c_str())) {
-            PROCMAPSINFO info{};
-            char perms[10];
-            char path[255];
-            char dev[25];
+        uintptr_t start = 0;
+        uintptr_t end = 0;
+        uintptr_t offset = 0;
+        char perms[8] = {};
+        char dev[32] = {};
+        char path[512] = {};
 
-            sscanf(
-                buffer,
-                "%" SCNxPTR "-%" SCNxPTR " %s %" SCNxPTR " %s %ld %s",
-                &info.start, &info.end, perms, &info.offset, dev, &info.inode, path);
-
-            /* Store process permissions in the struct directly via bitwise operations */
-            if (strchr(perms, 'r')) info.perms |= PROT_READ;
-            if (strchr(perms, 'w')) info.perms |= PROT_WRITE;
-            if (strchr(perms, 'x')) info.perms |= PROT_EXEC;
-            if (strchr(perms, 'r')) info.perms |= PROT_READ;
-
-            info.dev = dev;
-            info.path = path;
-
-            maps.push_back(info);
+        int n = sscanf(
+            buffer,
+            "%" SCNxPTR "-%" SCNxPTR " %7s %" SCNxPTR " %31s %*s %511[^\n]",
+            &start, &end, perms, &offset, dev, path);
+        if (n < 5) {
+            continue;
         }
+
+        std::string maps_path = (n >= 6) ? path : "";
+        while (!maps_path.empty() && (maps_path.front() == ' ' || maps_path.front() == '\t')) {
+            maps_path.erase(maps_path.begin());
+        }
+        if (!is_file_backed(maps_path)) {
+            continue;
+        }
+        if (basename_of(maps_path) != lib_name) {
+            continue;
+        }
+
+        MapEntry info{};
+        info.start = start;
+        info.end = end;
+        info.perms = 0;
+        if (strchr(perms, 'r')) info.perms |= PROT_READ;
+        if (strchr(perms, 'w')) info.perms |= PROT_WRITE;
+        if (strchr(perms, 'x')) info.perms |= PROT_EXEC;
+        info.path = maps_path;
+        maps.push_back(info);
     }
 
     fclose(fp);
-
     return maps;
 }
 
 void remap_lib(std::string lib_path) {
-    std::string lib_name = lib_path.substr(lib_path.find_last_of("/\\") + 1);
-
-    std::vector<PROCMAPSINFO> maps = get_modules_by_name(lib_name);
-    if (maps.size() == 0) {
+    std::string lib_name = basename_of(lib_path);
+    if (lib_name.empty()) {
         return;
     }
 
-    LOGI("Remapping %s", lib_name.c_str());
-
-    for (PROCMAPSINFO info : maps) {
-        void *address = reinterpret_cast<void *>(info.start);
-        size_t size = info.end - info.start;
-
-        void *map = mmap(0, size, PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-
-        if ((info.perms & PROT_READ) == 0) {
-            LOGI("Removing memory protection: %s", info.path);
-            mprotect(address, size, PROT_READ);
-        }
-
-        if (map == nullptr) {
-            LOGE("Failed to Allocate Memory: %s", strerror(errno));
-            return;
-        }
-
-        /* Copy the in-memory data to new virtual location via the memove, allocate and commit it via mremap */
-        std::memmove(map, address, size);
-        mremap(map, size, size, MREMAP_MAYMOVE | MREMAP_FIXED, info.start);
-
-        /* Re-apply memory protections */
-        mprotect(reinterpret_cast<void *>(info.start), size, info.perms);
-        LOGI("Allocated at address %p with size of %zu", map, size);
+    std::vector<MapEntry> maps = get_modules_by_name(lib_name);
+    if (maps.empty()) {
+        return;
     }
 
-    LOGI("Remapped");
+    LOGI("Remapping %s (%zu segments)", lib_name.c_str(), maps.size());
+
+    for (const MapEntry &info : maps) {
+        void *address = reinterpret_cast<void *>(info.start);
+        size_t size = info.end - info.start;
+        if (size == 0) {
+            continue;
+        }
+
+        void *copy = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        if (copy == MAP_FAILED) {
+            LOGE("Failed to allocate remap buffer: %s", strerror(errno));
+            continue;
+        }
+
+        int readable = info.perms | PROT_READ;
+        if ((info.perms & PROT_READ) == 0) {
+            if (mprotect(address, size, readable) != 0) {
+                LOGE("Failed to make %s readable: %s", info.path.c_str(), strerror(errno));
+                munmap(copy, size);
+                continue;
+            }
+        }
+
+        memcpy(copy, address, size);
+
+        void *remapped = mremap(copy, size, size, MREMAP_MAYMOVE | MREMAP_FIXED, address);
+        if (remapped == MAP_FAILED) {
+            LOGE("mremap failed for %s: %s", info.path.c_str(), strerror(errno));
+            munmap(copy, size);
+            mprotect(address, size, info.perms);
+            continue;
+        }
+
+        if (mprotect(address, size, info.perms) != 0) {
+            LOGW("Failed to restore prot on remapped %s: %s", info.path.c_str(), strerror(errno));
+        }
+    }
+
+    LOGI("Remapped %s", lib_name.c_str());
 }

@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { GADGET_PRESETS } from "../constants";
 
 const props = defineProps<{
   installed: boolean;
@@ -181,6 +182,29 @@ const jsonValid = computed(() => props.jsonError === null);
         </div>
       </CardHeader>
       <CardContent class="space-y-2">
+        <div class="flex flex-wrap gap-1.5">
+          <Button
+            variant="outline"
+            size="xs"
+            @click="emit('update:json', JSON.stringify(GADGET_PRESETS.listenLocal, null, 4))"
+          >
+            Listen 127.0.0.1
+          </Button>
+          <Button
+            variant="outline"
+            size="xs"
+            @click="emit('update:json', JSON.stringify(GADGET_PRESETS.listenAll, null, 4))"
+          >
+            Listen 0.0.0.0
+          </Button>
+          <Button
+            variant="outline"
+            size="xs"
+            @click="emit('update:json', JSON.stringify(GADGET_PRESETS.script, null, 4))"
+          >
+            Script mode
+          </Button>
+        </div>
         <div class="relative">
           <Textarea
             class="min-h-56 font-mono text-xs"
