@@ -15,14 +15,7 @@ export const DEFAULT_GADGET_CONFIG = {
 } as const;
 
 export const GADGET_PRESETS = {
-  listenLocal: {
-    interaction: {
-      type: "listen",
-      address: "127.0.0.1",
-      port: 27042,
-      on_load: "resume",
-    },
-  },
+  listenLocal: DEFAULT_GADGET_CONFIG,
   listenAll: {
     interaction: {
       type: "listen",

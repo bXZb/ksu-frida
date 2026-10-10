@@ -89,7 +89,7 @@ Example `config.json`:
         {
             "app_name": "com.example.app",
             "enabled": true,
-            "kernel_assisted_evasion": false,
+            "remap_injector": false,
             "start_up_delay_ms": 0,
             "injected_libraries": [
                 { "path": "/data/local/tmp/libsec/libsecmon.so" }
@@ -106,7 +106,7 @@ Example `config.json`:
 
 Leave `injected_libraries` empty to inject nothing for that target.
 
-`kernel_assisted_evasion` remaps the Zygisk injector mapping after the gadget starts. It does not talk to a kernel driver.
+`remap_injector` remaps the Zygisk injector mapping after the gadget starts. It does not talk to a kernel driver. Existing configs that still use `kernel_assisted_evasion` are accepted until the next WebUI save. Line-based `target_packages` files are no longer read; use `config.json`.
 
 ## Building
 

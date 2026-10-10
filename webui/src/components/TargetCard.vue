@@ -91,7 +91,7 @@ const confirmOpen = ref(false);
                   Hide this module in maps after gadget starts
                 </span>
               </span>
-              <Switch v-model="target.kernel_assisted_evasion" />
+              <Switch v-model="target.remap_injector" />
             </div>
 
             <div class="space-y-1.5">

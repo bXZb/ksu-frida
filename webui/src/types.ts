@@ -17,7 +17,7 @@ export interface ChildGating {
 export interface Target {
   app_name: string;
   enabled: boolean;
-  kernel_assisted_evasion: boolean;
+  remap_injector: boolean;
   start_up_delay_ms: number;
   injected_libraries: InjectedLibrary[];
   child_gating: ChildGating;

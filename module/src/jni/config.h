@@ -1,5 +1,5 @@
-#ifndef ZYGISKFRIDA_CONFIG_H
-#define ZYGISKFRIDA_CONFIG_H
+#ifndef KSUFRIDA_CONFIG_H
+#define KSUFRIDA_CONFIG_H
 
 #include <string>
 #include <vector>
@@ -15,11 +15,11 @@ struct target_config{
     bool enabled;
     std::string app_name;
     uint64_t start_up_delay_ms;
-    bool kernel_assisted_evasion;
+    bool remap_injector;
     std::vector<std::string> injected_libraries;
     child_gating_config child_gating;
 };
 
 std::optional<target_config> load_config(std::string const& module_dir, std::string const& app_name);
 
-#endif  // ZYGISKFRIDA_CONFIG_H
+#endif  // KSUFRIDA_CONFIG_H

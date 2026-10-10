@@ -36,12 +36,14 @@ function emptyChild(): ChildGating {
   return { enabled: false, mode: "freeze", injected_libraries: [] };
 }
 
-function normalizeTarget(raw: Partial<Target>): Target | null {
+function normalizeTarget(
+  raw: Partial<Target> & { kernel_assisted_evasion?: boolean },
+): Target | null {
   if (!raw.app_name) return null;
   return {
     app_name: raw.app_name,
     enabled: raw.enabled !== false,
-    kernel_assisted_evasion: Boolean(raw.kernel_assisted_evasion),
+    remap_injector: Boolean(raw.remap_injector ?? raw.kernel_assisted_evasion),
     start_up_delay_ms: Number(raw.start_up_delay_ms) || 0,
     injected_libraries: Array.isArray(raw.injected_libraries) ? raw.injected_libraries : defaultLibs(),
     child_gating: {
@@ -137,13 +139,17 @@ export function useFrida() {
     return labels[pkg] || pkg;
   }
 
-  async function writeConfig(): Promise<boolean> {
-    const json = prettyJson(config);
-    const r = await exec(
+  async function dualWriteText(tmpPath: string, mirrorName: string, contents: string) {
+    return exec(
       `mkdir -p ${GADGET_DIR} ${MODULE_RUNTIME_DIR} && ` +
-        `echo ${shellQuote(json)} > ${CONFIG_PATH} && chmod 644 ${CONFIG_PATH} && ` +
-        `cp -f ${CONFIG_PATH} ${MODULE_RUNTIME_DIR}/config.json && chmod 644 ${MODULE_RUNTIME_DIR}/config.json`,
+        `echo ${shellQuote(contents)} > ${tmpPath} && chmod 644 ${tmpPath} && ` +
+        `cp -f ${tmpPath} ${MODULE_RUNTIME_DIR}/${mirrorName} && ` +
+        `chmod 644 ${MODULE_RUNTIME_DIR}/${mirrorName}`,
     );
+  }
+
+  async function writeConfig(): Promise<boolean> {
+    const r = await dualWriteText(CONFIG_PATH, "config.json", prettyJson(config));
     return r.errno === 0;
   }
 
@@ -220,12 +226,7 @@ export function useFrida() {
       return false;
     }
     gadgetJson.value = pretty;
-    const r = await exec(
-      `mkdir -p ${GADGET_DIR} ${MODULE_RUNTIME_DIR} && ` +
-        `echo ${shellQuote(pretty)} > ${GADGET_CONFIG_PATH} && chmod 644 ${GADGET_CONFIG_PATH} && ` +
-        `cp -f ${GADGET_CONFIG_PATH} ${MODULE_RUNTIME_DIR}/libsecmon.config.so && ` +
-        `chmod 644 ${MODULE_RUNTIME_DIR}/libsecmon.config.so`,
-    );
+    const r = await dualWriteText(GADGET_CONFIG_PATH, "libsecmon.config.so", pretty);
     if (r.errno === 0) {
       gadgetJsonStatus.value = "ok";
       toast.success("Gadget config saved");
@@ -300,7 +301,7 @@ export function useFrida() {
       'chmod 644 "$DST"; ' +
       'HDR=$(od -An -N4 -tx1 "$DST" 2>/dev/null | tr -d \' \\n\'); ' +
       'if [ "$HDR" != "7f454c46" ]; then echo \'not an ELF .so\' >&2; rm -f "$DST"; exit 4; fi; ' +
-      `mkdir -p ${MODULE_RUNTIME_DIR}; cp -f "$DST" ${MODULE_RUNTIME_DIR}/libsecmon.so; ` +
+      `mkdir -p ${MODULE_RUNTIME_DIR} && cp -f "$DST" ${MODULE_RUNTIME_DIR}/libsecmon.so && ` +
       `chmod 644 ${MODULE_RUNTIME_DIR}/libsecmon.so; ` +
       "echo OK";
     const r = await exec(cmd);
@@ -397,7 +398,7 @@ export function useFrida() {
     config.targets.push({
       app_name: pkg,
       enabled: true,
-      kernel_assisted_evasion: false,
+      remap_injector: false,
       start_up_delay_ms: 0,
       injected_libraries: defaultLibs(),
       child_gating: emptyChild(),
@@ -439,10 +440,8 @@ export function useFrida() {
   return {
     tab,
     config,
-    labels,
     expanded,
     appFilter,
-    apps,
     fetchingApps,
     pickerOpen,
     pickerQuery,
@@ -475,6 +474,5 @@ export function useFrida() {
     addTarget,
     removeTarget,
     toggleExpand,
-    fetchApps,
   };
 }

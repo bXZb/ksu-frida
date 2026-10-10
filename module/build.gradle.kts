@@ -38,11 +38,9 @@ val buildWebui = tasks.register<Exec>("buildWebui") {
 }
 
 android {
-    namespace = "zygisk.frida"
+    namespace = "ksu.frida"
     compileSdk = 34
     ndkVersion = "25.2.9519653"
-
-    flavorDimensions += "api"
 
     defaultConfig {
         minSdk = 23
@@ -66,12 +64,6 @@ android {
             path("src/jni/Android.mk")
         }
     }
-
-    productFlavors {
-        create("Zygisk") {
-            dimension = "api"
-        }
-    }
 }
 
 dependencies {
@@ -82,11 +74,10 @@ dependencies {
 androidComponents {
     onVariants { variant ->
         val variantCapped = variant.name.replaceFirstChar { it.uppercaseChar() }
-        val buildType = variant.buildType
-        val flavorLowered = variant.flavorName!!.lowercase()
+        val buildType = checkNotNull(variant.buildType)
 
-        val zipName = "$moduleName-$moduleVersion-$flavorLowered-$buildType.zip"
-        val magiskDir = outDir.dir("magisk_module_${flavorLowered}_$buildType")
+        val zipName = "$moduleName-$moduleVersion-$buildType.zip"
+        val magiskDir = outDir.dir("magisk_module_$buildType")
 
         tasks.register<Sync>("prepareMagiskFiles$variantCapped") {
             dependsOn("assemble$variantCapped")
@@ -105,7 +96,7 @@ androidComponents {
                     "version" to moduleVersion,
                     "versionCode" to moduleVersionCode,
                     "author" to moduleAuthor,
-                    "description" to "$moduleDescription (flavor: $flavorLowered)",
+                    "description" to moduleDescription,
                 )
                 filter<FixCrLfFilter>("eol" to FixCrLfFilter.CrLf.newInstance("lf"))
             }
@@ -113,7 +104,6 @@ androidComponents {
                 include("customize.sh", "verify.sh")
                 filter<ReplaceTokens>(
                     "tokens" to mapOf(
-                        "FLAVOR" to flavorLowered,
                         "MODULE_ID" to magiskModuleId,
                     ),
                 )
@@ -126,11 +116,11 @@ androidComponents {
                 into("lib")
             }
             doLast {
-                // Flatten lib/<abi>/libzygiskfrida.so to lib/<abi>.so (Zygisk convention)
+                // Flatten lib/<abi>/libksufrida.so to lib/<abi>.so (Zygisk convention)
                 val libRoot = magiskDir.asFile.resolve("lib")
                 libRoot.listFiles()?.forEach { abiDir ->
                     if (!abiDir.isDirectory) return@forEach
-                    val so = abiDir.resolve("libzygiskfrida.so")
+                    val so = abiDir.resolve("libksufrida.so")
                     if (so.exists()) {
                         Files.move(so.toPath(), libRoot.resolve("${abiDir.name}.so").toPath())
                     }

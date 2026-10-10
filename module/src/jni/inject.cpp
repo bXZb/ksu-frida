@@ -203,7 +203,7 @@ static void inject_libs(target_config const &cfg, pid_t pid) {
         unlink_staged(staged);
     }
 
-    if (cfg.kernel_assisted_evasion) {
+    if (cfg.remap_injector) {
         LOGI("Remap injector enabled for PID %d (userspace maps hide; no kernel driver)", pid);
         remap_injector();
     }
